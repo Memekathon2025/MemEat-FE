@@ -1,0 +1,167 @@
+.game-overlay {
+  position: fixed;
+  bottom: 40px;
+  right: 20px;
+  /* background: rgba(255, 255, 255, 0.95); */
+  /* border-radius: 15px; */
+  padding: 1.5rem;
+  min-width: 280px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.player-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem !important;
+  padding-bottom: 1rem;
+  /* border-bottom: 2px solid #f0f0f0; */
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  color: white !important;
+  font-size: 0.9rem;
+}
+
+.stat-value {
+  font-weight: bold;
+  color: white;
+  font-size: 1.2rem !important;
+}
+
+.stat-value.score {
+  /* color: #667eea; */
+  color: white;
+  /* font-size: 1.5rem; */
+}
+
+.collected-tokens {
+  margin-bottom: 1rem;
+}
+
+.collected-tokens h4 {
+  margin: 0 0 0.5rem 0;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.token-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.token-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: bold;
+}
+
+.token-symbol {
+  font-size: 0.85rem !important;
+}
+
+.token-amount {
+  font-size: 0.9rem !important;
+  color: #667eea !important;
+}
+
+.escape-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #f0f0f0;
+}
+
+.escape-button {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.escape-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+}
+
+.escape-button.pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+}
+
+.escape-hint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: white;
+  /* color: #666; */
+  text-align: center;
+}
+
+.progress-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #f0f0f0;
+}
+
+.progress-text {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: white;
+  /* color: #666; */
+  text-align: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s;
+  border-radius: 10px;
+}
+
+.controls-hint {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #f0f0f0;
+}
+
+.controls-hint p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #999;
+  text-align: center;
+}

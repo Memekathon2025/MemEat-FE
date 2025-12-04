@@ -1,0 +1,414 @@
+.start-screen {
+  position: fixed;
+  top: 60px; /* NavBar 높이 */
+  left: 0;
+  width: 100%;
+  height: calc(100% - 60px);
+  background: #0e1021;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  overflow: hidden;
+  border: 2px solid white;
+}
+
+.start-screen-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 600px;
+  width: 90%;
+  margin: 0 auto;
+  padding: 2rem 3rem;
+  overflow-y: auto;
+}
+
+.game-header {
+  position: sticky;
+  width: 100%;
+  top: 0;
+  z-index: 100;
+  background: #0e1021;
+  padding: 4rem 0 2rem 0;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.game-title {
+  font-size: 5rem;
+  margin: 0;
+  background: linear-gradient(135deg, #36df53 0%, #9e79fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+}
+
+.game-subtitle {
+  color: #d2aaff;
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.start-screen-content > *:not(.game-header) {
+  flex-shrink: 0;
+}
+
+.connect-button,
+.stake-button,
+.start-button {
+  font-family: "Galmuri11", monospace !important;
+  background: linear-gradient(135deg, #d2aaff 0%, #9e79fa 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  width: 100%;
+  margin-top: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.connect-button::before,
+.stake-button::before,
+.start-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.connect-button:hover,
+.stake-button:hover,
+.start-button:hover {
+  animation: shake 0.5s ease-in-out infinite, colorChange 0.1s infinite;
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.6),
+    0 0 30px rgba(210, 170, 255, 0.5), 0 0 60px rgba(158, 121, 250, 0.3);
+  background: linear-gradient(135deg, #e0bfff 0%, #b08fff 100%);
+}
+
+.connect-button:hover::before,
+.stake-button:hover::before,
+.start-button:hover::before {
+  left: 100%;
+}
+
+@keyframes shake {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  10% {
+    transform: translate(-4px, -3px) rotate(-2deg);
+  }
+  20% {
+    transform: translate(4px, 3px) rotate(2deg);
+  }
+  30% {
+    transform: translate(-3px, 4px) rotate(-1deg);
+  }
+  40% {
+    transform: translate(3px, -4px) rotate(1deg);
+  }
+  50% {
+    transform: translate(-2px, -2px) rotate(-2deg);
+  }
+  60% {
+    transform: translate(2px, 2px) rotate(2deg);
+  }
+  70% {
+    transform: translate(-3px, 3px) rotate(-1deg);
+  }
+  80% {
+    transform: translate(3px, -3px) rotate(1deg);
+  }
+  90% {
+    transform: translate(-2px, 2px) rotate(-2deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes colorChange {
+  0%,
+  100% {
+    color: #667eea;
+  }
+  50% {
+    color: #ff0000;
+  }
+}
+
+.connect-button:disabled,
+.stake-button:disabled,
+.start-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  animation: none !important;
+}
+
+.wallet-info {
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.wallet-label {
+  color: #666;
+  margin-right: 0.5rem;
+}
+
+.wallet-address {
+  font-weight: bold;
+  color: white;
+}
+
+.name-input {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid white;
+  color: white;
+  /* border: 2px solid #ddd; */
+  /* border-radius: 10px; */
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  margin-bottom: 10px;
+}
+
+.name-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.staking-modal {
+  text-align: left;
+}
+
+.staking-modal h2 {
+  text-align: center;
+  color: white;
+  margin-bottom: 2rem;
+}
+
+.staking-info {
+  text-align: center;
+  color: white;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.token-select,
+.amount-input-section {
+  margin-bottom: 1.5rem;
+}
+
+.token-select label,
+.amount-input-section label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: white;
+  font-weight: bold;
+}
+
+.token-select select,
+.amount-input {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.amount-helpers {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.amount-helpers button {
+  flex: 1;
+  padding: 0.5rem;
+  border: 2px solid #667eea;
+  background: white;
+  color: #667eea;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.amount-helpers button:hover {
+  background: #667eea;
+  color: white;
+}
+
+.balance-info {
+  margin-top: 0.5rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.back-button {
+  flex: 1;
+  padding: 1rem;
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.back-button:hover {
+  background: #d0d0d0;
+}
+
+.game-info {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #eee;
+  text-align: left;
+}
+
+.game-info h3 {
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.game-info ul {
+  list-style: none;
+  padding: 0;
+}
+
+.game-info li {
+  padding: 0.5rem 0;
+  color: white;
+}
+
+.info-text {
+  color: #888;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+/* 토큰 타입 선택 라디오 버튼 */
+.token-type-selection {
+  margin: 20px 0;
+  color: white;
+}
+
+.radio-group {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.radio-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+/* MRC-20 주소 입력 */
+.mrc20-section {
+  margin: 20px 0;
+}
+
+.address-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.verify-button {
+  font-family: "Galmuri11", monospace !important;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  background: #667eea;
+  border: none;
+  border-radius: 20px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 0.5rem;
+}
+
+.verify-button:hover:not(:disabled) {
+  background: #00b8bb;
+  transform: translateY(-2px);
+}
+
+.verify-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 토큰 정보 박스 */
+.token-info-box {
+  margin: 20px 0;
+  padding-top: 20px;
+  /* border-top: 2px solid white; */
+  /* background: rgba(0, 0, 0, 0.4); */
+  color: white;
+}
+
+.token-info-box.success {
+  border-color: #00ff00;
+  /* background: rgba(0, 255, 0, 0.1); */
+}
+
+.token-info-box h3 {
+  margin: 0 0 15px 0;
+  color: #ffd700;
+}
+
+.token-info-box p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.token-info-box strong {
+  color: #00ff00;
+}
+
+/* 에러 메시지 */
+.error-message {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ff4444;
+  margin: 10px 0;
+  font-size: 14px;
+}
