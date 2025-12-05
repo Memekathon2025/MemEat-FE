@@ -62,8 +62,9 @@ function App() {
       setCanEscape(can);
     });
 
-    socketService.onEscapeSuccess(() => {
-      handleGameOver(true);
+    socketService.onEscapeSuccess((data) => {
+      console.log("🎉 Received escape-success event with data:", data);
+      handleGameOver(true, data);
     });
 
     socketService.onEscapeFailed((data) => {
@@ -105,16 +106,33 @@ function App() {
     }
   };
 
-  const handleGameOver = (success: boolean) => {
-    if (currentPlayer) {
-      setFinalScore(currentPlayer.score);
-      setFinalTokens(currentPlayer.collectedTokens);
+  const handleGameOver = (
+    success: boolean,
+    data?: { score: number; collectedTokens: TokenBalance[] }
+  ) => {
+    console.log(
+      "Handling Game Over. Success:",
+      success,
+      "Data:",
+      data,
+      "CurrentPlayer:",
+      currentPlayer
+    );
+
+    const score = data?.score ?? currentPlayer?.score ?? 0;
+    const tokens = data?.collectedTokens ?? currentPlayer?.collectedTokens ?? [];
+
+    if (currentPlayer || data) {
+      setFinalScore(score);
+      setFinalTokens(tokens);
       setGameOverSuccess(success);
       setGamePhase("gameover");
 
       if (!success) {
         socketService.playerDied();
       }
+    } else {
+      console.error("❌ Current player is missing during game over handling!");
     }
   };
 

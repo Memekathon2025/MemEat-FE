@@ -6,9 +6,14 @@ class SocketService {
   private serverUrl: string = "http://localhost:3333";
 
   connect() {
-    if (this.socket?.connected) {
-      console.log("Already connected to server");
-      return this.socket;
+    if (this.socket) {
+      if (this.socket.connected) {
+        console.log("Already connected to server");
+        return this.socket;
+      }
+      // If socket exists but not connected, it might be connecting.
+      // In strict mode, we might want to reuse it or close it properly.
+      // For now, let's just return it if it's not explicitly disconnected.
     }
 
     this.socket = io(this.serverUrl, {
@@ -16,6 +21,7 @@ class SocketService {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      autoConnect: true,
     });
 
     this.socket.on("connect", () => {
@@ -103,7 +109,7 @@ class SocketService {
     this.socket?.on("can-escape", callback);
   }
 
-  onEscapeSuccess(callback: () => void) {
+  onEscapeSuccess(callback: (data: { score: number; collectedTokens: TokenBalance[] }) => void) {
     this.socket?.on("escape-success", callback);
   }
 

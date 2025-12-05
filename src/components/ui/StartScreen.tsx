@@ -3,10 +3,6 @@ import { mockWeb3 } from "../../services/mockWeb3";
 import type { MockToken, TokenBalance } from "../../types";
 import "../../styles/StartScreen.css";
 import {
-  AppKitAccountButton,
-  AppKitButton,
-  AppKitConnectButton,
-  AppKitNetworkButton,
   useAppKit,
   useAppKitAccount,
 } from "@reown/appkit/react";
