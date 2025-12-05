@@ -5,13 +5,11 @@ import "../../styles/GameOverlay.css";
 interface GameOverlayProps {
   currentPlayer: Player | null;
   canEscape: boolean;
-  onEscape: () => void;
 }
 
 export const GameOverlay: React.FC<GameOverlayProps> = ({
   currentPlayer,
   canEscape,
-  onEscape,
 }) => {
   if (!currentPlayer) return null;
 

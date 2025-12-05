@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { socketService } from "./services/socket";
+import { useGameStore } from "./store/gameStore";
+
 import { StartScreen } from "./components/ui/StartScreen";
 import { GameCanvas } from "./components/game/GameCanvas";
 import { Leaderboard } from "./components/ui/Leaderboard";
 import { GameOverlay } from "./components/ui/GameOverlay";
 import { GameOver } from "./components/ui/GameOver";
-import { socketService } from "./services/socket";
-import { useGameStore } from "./store/gameStore";
-import { mockWeb3 } from "./services/mockWeb3";
-import type { TokenBalance } from "./types";
-import "./App.css";
 import { NavBar } from "./components/ui/NavBar";
+
+import type { Player, TokenBalance } from "./types";
+import "./App.css";
 
 type GamePhase = "start" | "playing" | "gameover";
 
@@ -17,7 +19,6 @@ function App() {
   const {
     currentPlayer,
     setCurrentPlayer,
-    gameStarted,
     setGameStarted,
     leaderboard,
     setLeaderboard,
@@ -33,29 +34,46 @@ function App() {
   const [finalScore, setFinalScore] = useState(0);
   const [finalTokens, setFinalTokens] = useState<TokenBalance[]>([]);
 
-  useEffect(() => {
-    // Connect to server
-    socketService.connect();
+  const handleGameOver = useCallback(
+    (success: boolean, player?: Player) => {
+      const playerToUse = player || currentPlayer;
 
-    // Setup socket listeners
+      if (playerToUse) {
+        setFinalScore(playerToUse.score);
+        setFinalTokens(playerToUse.collectedTokens);
+        setGameOverSuccess(success);
+        setGamePhase("gameover");
+
+        if (!success) {
+          socketService.playerDied();
+        }
+      }
+    },
+    [currentPlayer]
+  );
+
+  // 리스너 등록 함수를 분리
+  const setupSocketListeners = () => {
     socketService.onPlayerJoined((player) => {
       console.log("Player joined:", player);
     });
 
     socketService.onGameState((state) => {
-      console.log("Game state received:", state);
+      // console.log("Game state received:", state);
       setPlayers(state.players);
       setFoods(state.foods);
       setLeaderboard(state.leaderboard);
     });
 
     socketService.onGameStateUpdate((data) => {
+      // console.log("Game state update received:", data);
       setLeaderboard(data.leaderboard);
     });
 
-    socketService.onPlayerDiedCollision(() => {
-      console.log("💥 You died from collision!");
-      handleGameOver(false);
+    socketService.onPlayerDiedCollision((deadPlayer) => {
+      // console.log("💥 You died from collision!");
+      // escape unlock 상태에서 죽으면 탈출 성공으로 간주
+      handleGameOver(canEscape, deadPlayer);
     });
 
     socketService.onCanEscape((can) => {
@@ -74,7 +92,11 @@ function App() {
       console.error("Socket error:", error);
       alert(error.message);
     });
+  };
 
+  useEffect(() => {
+    socketService.connect();
+    setupSocketListeners();
     return () => {
       socketService.disconnect();
     };
@@ -85,7 +107,7 @@ function App() {
     walletAddress: string;
     stakedTokens: TokenBalance[];
   }) => {
-    console.log("Starting game with:", playerData);
+    // console.log("Starting game with:", playerData);
 
     socketService.joinGame(playerData);
 
@@ -99,33 +121,14 @@ function App() {
     });
   };
 
-  const handleEscape = () => {
-    if (currentPlayer && canEscape) {
-      socketService.playerEscape();
-    }
-  };
-
-  const handleGameOver = (success: boolean) => {
-    if (currentPlayer) {
-      setFinalScore(currentPlayer.score);
-      setFinalTokens(currentPlayer.collectedTokens);
-      setGameOverSuccess(success);
-      setGamePhase("gameover");
-
-      if (!success) {
-        socketService.playerDied();
-      }
-    }
-  };
-
   const handlePlayAgain = async () => {
     reset();
     setGamePhase("start");
     socketService.disconnect();
 
-    // Wait a bit before reconnecting
     setTimeout(() => {
       socketService.connect();
+      setupSocketListeners(); // 리스너 재등록
     }, 500);
   };
 
@@ -138,29 +141,21 @@ function App() {
       {gamePhase === "playing" && (
         <>
           <Leaderboard leaderboard={leaderboard} />
-          <GameOverlay
-            currentPlayer={currentPlayer}
-            canEscape={canEscape}
-            onEscape={handleEscape}
-          />
-          <GameCanvas onGameOver={handleGameOver} />
+          <GameOverlay currentPlayer={currentPlayer} canEscape={canEscape} />
+          <GameCanvas />
         </>
       )}
       {gamePhase === "gameover" && (
         <>
           <Leaderboard leaderboard={leaderboard} />
-          <GameOverlay
-            currentPlayer={currentPlayer}
-            canEscape={canEscape}
-            onEscape={handleEscape}
-          />
+          <GameOverlay currentPlayer={currentPlayer} canEscape={canEscape} />
           <GameOver
             success={gameOverSuccess}
             score={finalScore}
             collectedTokens={finalTokens}
             onPlayAgain={handlePlayAgain}
           />
-          <GameCanvas onGameOver={handleGameOver} />
+          <GameCanvas />
         </>
       )}
     </div>

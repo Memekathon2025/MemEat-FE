@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { mockWeb3 } from "../../services/mockWeb3";
-import type { MockToken, TokenBalance } from "../../types";
-import "../../styles/StartScreen.css";
-import {
-  AppKitAccountButton,
-  AppKitButton,
-  AppKitConnectButton,
-  AppKitNetworkButton,
-  useAppKit,
-  useAppKitAccount,
-} from "@reown/appkit/react";
+import { useAppKit } from "@reown/appkit/react";
 import { useAccount, useBalance, useChainId, usePublicClient } from "wagmi";
 import { formatUnits } from "viem";
+
 import { web3Service } from "../../services/web3Service";
+import { mockWeb3 } from "../../services/mockWeb3";
+
+import type { TokenBalance } from "../../types";
+import "../../styles/StartScreen.css";
+import coin from "../../assets/coin.gif";
 
 interface StartScreenProps {
   onStart: (playerData: {
@@ -217,9 +213,14 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
 
   return (
     <div className="start-screen">
+      <div className="" />
       <div className="start-screen-content">
         <div className="game-header">
-          <h1 className="game-title">MemEat</h1>
+          <h1 className="game-title">
+            <img src={coin} className="" />
+            MemEat
+            <img src={coin} className="" />
+          </h1>
           <p className="game-subtitle">Eat as many memes as you can!</p>
         </div>
 
@@ -269,7 +270,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
               </>
             ) : (
               <div className="staking-modal">
-                <h2>💰 TOKEN STAKING 💰</h2>
+                <h2>TOKEN STAKING</h2>
                 {/* <p className="staking-info">
                   게임 입장료: <strong>M {mockWeb3.getBaseEntryFee()}개</strong>{" "}
                   상응하는 토큰

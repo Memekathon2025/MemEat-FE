@@ -1,49 +1,61 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { socketService } from "../../services/socket";
 import { useGameStore } from "../../store/gameStore";
-import type { Player, Point } from "../../types";
 import { GameUtils } from "./utils";
+
+import { SnakeRenderer } from "./renderers/SnakeRenerer";
+import { BackgroundRenderer } from "./renderers/BackgroundRendrer";
+import { MinimapRenderer } from "./renderers/MinimapRenderer";
+
+import { useGameLoop } from "../../hooks/useGameLoop";
+import { useOtherPlayers } from "../../hooks/useOtherPlayers";
+
+// 📦 Constants & Types
+import {
+  SCREEN_SIZE,
+  SPAWN_ZONE_SIZE,
+  MAP_CENTER,
+  BASE_SIZE,
+  SIZE_INCREASE_INTERVAL,
+  SIZE_INCREMENT,
+  MAX_SIZE,
+  LERP_FACTOR,
+  MAX_VISIBLE_PLAYERS,
+} from "./constants";
+import type { LocalPlayer, SnakeBodyPart, SnakeColors } from "./types";
+import type { Player, Point } from "../../types";
 
 import "../../styles/GameCanvas.css";
 import backgroundImage from "../../assets/background.jpg";
 
-interface GameCanvasProps {
-  onGameOver: (success: boolean) => void;
-}
-
-export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
+export const GameCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const backgroundPatternRef = useRef<CanvasPattern | null>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
 
-  const {
-    currentPlayer,
-    setCurrentPlayer,
-    foods,
-    setFoods,
-    removeFood,
-    players,
-    setPlayers,
-    canEscape,
-  } = useGameStore();
+  const { currentPlayer, setCurrentPlayer, removeFood } = useGameStore();
 
-  const [localPlayer, setLocalPlayer] = useState<any>(null);
-  const localPlayerRef = useRef<any>(null);
-  const worldRef = useRef<Point>({ x: -1200, y: -600 });
+  const [localPlayer, setLocalPlayer] = useState<LocalPlayer | null>(null);
+  const localPlayerRef = useRef<LocalPlayer | null>(null);
+  const worldRef = useRef<Point>({ x: -400, y: -100 });
   const velocityRef = useRef<Point>({ x: 0, y: 0 });
   const angleRef = useRef<number>(0);
-  const animationIdRef = useRef<number>(0);
+  const [isPaused, setIsPaused] = useState(true);
+  const isPausedRef = useRef<boolean>(true);
 
-  const WORLD_SIZE = { width: 4000, height: 2000 };
-  const SCREEN_SIZE = { width: 1000, height: 800 };
+  const {
+    bodyPartsRef,
+    colorsRef,
+    initializePlayer,
+    updateTarget,
+    interpolate,
+  } = useOtherPlayers();
 
-  // Initialize player once when currentPlayer is set
+  // 1. 플레이어 초기화
   useEffect(() => {
     if (!currentPlayer) return;
 
-    console.log("Initializing player:", currentPlayer);
-
-    const player = {
+    const player: LocalPlayer = {
       ...currentPlayer,
       bodyParts: Array(currentPlayer.length)
         .fill(null)
@@ -51,7 +63,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
           x: SCREEN_SIZE.width / 2,
           y: SCREEN_SIZE.height / 2,
         })),
-      size: 7,
+      size: BASE_SIZE,
       force: 5,
       mainColor: GameUtils.randomColor(),
       midColor: "",
@@ -62,54 +74,58 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
 
     setLocalPlayer(player);
     localPlayerRef.current = player;
-  }, [currentPlayer?.id]); // Only re-run when player ID changes
+  }, [currentPlayer?.id]);
 
-  // Setup socket listeners
+  // 2. 소켓 리스너 설정
   useEffect(() => {
-    console.log("Setting up socket listeners");
-
+    // 게임 상태 업데이트
     socketService.onGameState((state) => {
-      console.log("Game state:", state);
-      // console.log("🍎 Foods in state:", state.foods?.length || 0, state.foods);
-      setPlayers(state.players);
-      setFoods(state.foods);
+      state.players.forEach((player) => {
+        if (player.id === currentPlayer?.id) return;
+
+        // useOtherPlayers 훅 사용
+        initializePlayer(player);
+        updateTarget(player.id, player.position, player.angle || 0);
+
+        // bodyParts 길이 조정
+        const bodyParts = bodyPartsRef.current.get(player.id);
+        if (bodyParts) {
+          while (bodyParts.length < player.length) {
+            const lastPart = bodyParts[bodyParts.length - 1];
+            bodyParts.push({ x: lastPart.x, y: lastPart.y });
+          }
+          while (bodyParts.length > player.length) {
+            bodyParts.pop();
+          }
+        }
+      });
     });
 
+    // 음식 먹기
     socketService.onFoodEaten((data) => {
       removeFood(data.foodId);
     });
 
+    // 플레이어 업데이트
     socketService.onPlayerUpdated((updatedPlayer) => {
       if (currentPlayer && updatedPlayer.id === currentPlayer.id) {
         setCurrentPlayer(updatedPlayer);
-        setLocalPlayer((prev: any) => {
+        setLocalPlayer((prev) => {
           if (!prev) return prev;
 
-          // 길이가 늘어났으면 bodyParts에 새 세그먼트 추가
-          const newBodyParts = [...prev.bodyParts];
-          const oldLength = newBodyParts.length;
-
+          const newBodyParts: SnakeBodyPart[] = [...prev.bodyParts];
           while (newBodyParts.length < updatedPlayer.length) {
             const lastPart = newBodyParts[newBodyParts.length - 1];
             newBodyParts.push({ x: lastPart.x, y: lastPart.y });
           }
 
-          // ✅ 길이에 따라 사이즈 증가 (30의 배수마다)
-          let newSize = 7;
-          const MAXSIZE = 20;
-          // 30마다 1씩 증가
-          const sizeBonus = Math.floor(updatedPlayer.length / 30);
-          newSize = 7 + sizeBonus * 1.5; // ✅ 1.5씩 증가 (더 눈에 띄게)
+          const sizeBonus = Math.floor(
+            updatedPlayer.length / SIZE_INCREASE_INTERVAL
+          );
+          let newSize = BASE_SIZE + sizeBonus * SIZE_INCREMENT;
+          if (newSize > MAX_SIZE) newSize = MAX_SIZE;
 
-          if (newSize > MAXSIZE) newSize = MAXSIZE;
-
-          if (sizeBonus > Math.floor(prev.length / 30)) {
-            console.log(
-              `📏 Size increased to ${newSize}! (Length: ${updatedPlayer.length})`
-            );
-          }
-
-          const updated = {
+          const updated: LocalPlayer = {
             ...prev,
             score: updatedPlayer.score,
             length: updatedPlayer.length,
@@ -123,9 +139,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
         });
       }
     });
-  }, [currentPlayer?.id]);
+  }, [
+    currentPlayer?.id,
+    initializePlayer,
+    updateTarget,
+    bodyPartsRef,
+    removeFood,
+    setCurrentPlayer,
+  ]);
 
-  // Load background image
+  // 3. 배경 이미지 로드
   useEffect(() => {
     const img = new Image();
     img.src = backgroundImage;
@@ -144,714 +167,310 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
     };
   }, []);
 
-  // Setup canvas and game loop
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !localPlayer) {
-      console.log("Canvas or localPlayer not ready", {
-        canvas: !!canvas,
-        localPlayer: !!localPlayer,
-      });
-      return;
+  // 4. 플레이어 이동 업데이트
+  const updatePlayerMovement = useCallback(() => {
+    if (!localPlayerRef.current || isPausedRef.current) return;
+
+    const playerRef = localPlayerRef.current;
+
+    // 속도 업데이트
+    velocityRef.current = {
+      x: playerRef.force * Math.cos(angleRef.current),
+      y: playerRef.force * Math.sin(angleRef.current),
+    };
+
+    // 월드 오프셋 업데이트
+    worldRef.current = {
+      x: worldRef.current.x + velocityRef.current.x,
+      y: worldRef.current.y + velocityRef.current.y,
+    };
+
+    // bodyParts 업데이트
+    const d = playerRef.size / 2;
+
+    for (let i = playerRef.bodyParts.length - 1; i >= 1; i--) {
+      playerRef.bodyParts[i].x =
+        playerRef.bodyParts[i - 1].x - d * Math.cos(angleRef.current);
+      playerRef.bodyParts[i].y =
+        playerRef.bodyParts[i - 1].y - d * Math.sin(angleRef.current);
     }
 
-    console.log("Starting game loop");
+    if (playerRef.bodyParts.length > 0) {
+      const headX = SCREEN_SIZE.width / 2;
+      const headY = SCREEN_SIZE.height / 2;
+      playerRef.bodyParts[0].x = headX - d * Math.cos(angleRef.current);
+      playerRef.bodyParts[0].y = headY - d * Math.sin(angleRef.current);
+    }
 
-    const ctx = canvas.getContext("2d");
+    // 서버에 위치 업데이트
+    socketService.updatePosition({
+      x: -worldRef.current.x + SCREEN_SIZE.width / 2,
+      y: -worldRef.current.y + SCREEN_SIZE.height / 2,
+      angle: angleRef.current,
+    });
+  }, []);
+
+  // 5. 렌더링 함수들
+  const renderSafeZone = useCallback((ctx: CanvasRenderingContext2D) => {
+    const spawnScreenX = SCREEN_SIZE.width - MAP_CENTER.x - worldRef.current.x;
+    const spawnScreenY = SCREEN_SIZE.height - MAP_CENTER.y - worldRef.current.y;
+
+    const margin = 100;
+    if (
+      spawnScreenX > -SPAWN_ZONE_SIZE - margin &&
+      spawnScreenX < SCREEN_SIZE.width + margin &&
+      spawnScreenY > -SPAWN_ZONE_SIZE - margin &&
+      spawnScreenY < SCREEN_SIZE.height + margin
+    ) {
+      ctx.fillStyle = "rgba(0, 255, 0, 0.1)";
+      ctx.fillRect(
+        spawnScreenX - SPAWN_ZONE_SIZE / 2,
+        spawnScreenY - SPAWN_ZONE_SIZE / 2,
+        SPAWN_ZONE_SIZE,
+        SPAWN_ZONE_SIZE
+      );
+
+      ctx.strokeStyle = "rgba(0, 255, 0, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(
+        spawnScreenX - SPAWN_ZONE_SIZE / 2,
+        spawnScreenY - SPAWN_ZONE_SIZE / 2,
+        SPAWN_ZONE_SIZE,
+        SPAWN_ZONE_SIZE
+      );
+
+      ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
+      ctx.beginPath();
+      ctx.arc(spawnScreenX, spawnScreenY, 5, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.font = "bold 16px Arial";
+      ctx.fillStyle = "rgba(0, 255, 0, 0.8)";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        "SAFE ZONE",
+        spawnScreenX,
+        spawnScreenY - SPAWN_ZONE_SIZE / 2 - 10
+      );
+    }
+  }, []);
+
+  const renderFoods = useCallback((ctx: CanvasRenderingContext2D) => {
+    const currentFoods = useGameStore.getState().foods;
+
+    currentFoods.forEach((food) => {
+      const screenX = food.position.x - worldRef.current.x;
+      const screenY = food.position.y - worldRef.current.y;
+
+      if (
+        screenX > -50 &&
+        screenX < SCREEN_SIZE.width + 50 &&
+        screenY > -50 &&
+        screenY < SCREEN_SIZE.height + 50
+      ) {
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = food.token.color;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 5, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 2, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // 충돌 체크
+        if (localPlayerRef.current) {
+          const centerX = SCREEN_SIZE.width / 2;
+          const centerY = SCREEN_SIZE.height / 2;
+          if (
+            GameUtils.circleCollision(
+              centerX,
+              centerY,
+              localPlayerRef.current.size + 3,
+              screenX,
+              screenY,
+              5
+            )
+          ) {
+            socketService.eatFood(food.id);
+          }
+        }
+      }
+    });
+
+    ctx.globalAlpha = 1;
+  }, []);
+
+  const renderOtherPlayers = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const allPlayers = useGameStore.getState().players;
+      const visiblePlayers: Player[] = [];
+
+      // 화면에 보이는 플레이어 필터링
+      allPlayers.forEach((otherPlayer) => {
+        if (otherPlayer.id === currentPlayer?.id || !otherPlayer.alive) return;
+
+        const screenX =
+          SCREEN_SIZE.width - otherPlayer.position.x - worldRef.current.x;
+        const screenY =
+          SCREEN_SIZE.height - otherPlayer.position.y - worldRef.current.y;
+
+        const margin = 100;
+        if (
+          screenX >= -margin &&
+          screenX <= SCREEN_SIZE.width + margin &&
+          screenY >= -margin &&
+          screenY <= SCREEN_SIZE.height + margin
+        ) {
+          visiblePlayers.push(otherPlayer);
+        }
+      });
+
+      // 최대 50명까지만 렌더링
+      visiblePlayers.slice(0, MAX_VISIBLE_PLAYERS).forEach((otherPlayer) => {
+        // 보간 사용 (useOtherPlayers 훅)
+        const current = interpolate(otherPlayer.id, LERP_FACTOR);
+
+        if (current) {
+          otherPlayer.position.x = current.position.x;
+          otherPlayer.position.y = current.position.y;
+          otherPlayer.angle = current.angle;
+        }
+
+        const screenX =
+          SCREEN_SIZE.width - otherPlayer.position.x - worldRef.current.x;
+        const screenY =
+          SCREEN_SIZE.height - otherPlayer.position.y - worldRef.current.y;
+
+        // bodyParts 업데이트
+        let bodyParts = bodyPartsRef.current.get(otherPlayer.id) || [];
+        const angle = otherPlayer.angle || 0;
+        const sizeBonus = Math.floor(
+          otherPlayer.length / SIZE_INCREASE_INTERVAL
+        );
+        const finalSize = Math.min(
+          BASE_SIZE + sizeBonus * SIZE_INCREMENT,
+          MAX_SIZE
+        );
+        const d = finalSize / 2;
+
+        if (bodyParts.length > 0) {
+          bodyParts[0].x = screenX - d * Math.cos(angle);
+          bodyParts[0].y = screenY - d * Math.sin(angle);
+        }
+
+        for (let i = 1; i < bodyParts.length; i++) {
+          bodyParts[i].x = bodyParts[i - 1].x - d * Math.cos(angle);
+          bodyParts[i].y = bodyParts[i - 1].y - d * Math.sin(angle);
+        }
+
+        // 색상 가져오기
+        const colors: SnakeColors = colorsRef.current.get(otherPlayer.id) || {
+          mainColor: "#FF6B6B",
+          midColor: "#FF8E8E",
+          supportColor: "#FFB3B3",
+        };
+
+        // SnakeRenderer 사용
+        SnakeRenderer.drawSnake(
+          ctx,
+          bodyParts,
+          screenX,
+          screenY,
+          angle,
+          finalSize,
+          colors,
+          otherPlayer.name
+        );
+      });
+
+      ctx.globalAlpha = 1;
+    },
+    [currentPlayer?.id, interpolate, bodyPartsRef, colorsRef]
+  );
+
+  // 6. 메인 렌더링 함수
+  const renderGame = useCallback(() => {
+    const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
 
+    ctx.clearRect(0, 0, SCREEN_SIZE.width, SCREEN_SIZE.height);
+
+    BackgroundRenderer.drawBackground(
+      ctx,
+      backgroundPatternRef.current,
+      backgroundImageRef.current,
+      worldRef.current
+    );
+    updatePlayerMovement();
+    renderSafeZone(ctx);
+    renderFoods(ctx);
+
+    if (localPlayerRef.current) {
+      const colors: SnakeColors = {
+        mainColor: localPlayerRef.current.mainColor,
+        midColor: localPlayerRef.current.midColor,
+        supportColor: localPlayerRef.current.supportColor,
+      };
+
+      SnakeRenderer.drawSnake(
+        ctx,
+        localPlayerRef.current.bodyParts,
+        SCREEN_SIZE.width / 2,
+        SCREEN_SIZE.height / 2,
+        angleRef.current,
+        localPlayerRef.current.size,
+        colors,
+        localPlayerRef.current.name
+      );
+    }
+
+    renderOtherPlayers(ctx);
+
+    MinimapRenderer.draw(ctx, localPlayerRef.current, worldRef.current);
+  }, [updatePlayerMovement, renderSafeZone, renderFoods, renderOtherPlayers]);
+
+  // 7. 게임 루프 (useGameLoop 훅 사용)
+  useGameLoop({
+    enabled: !!localPlayer,
+    onUpdate: renderGame,
+  });
+
+  // 8. 이벤트 리스너
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !localPlayer) return;
+
+    // 마우스 이동
     const handleMouseMove = (e: MouseEvent) => {
       const pos = GameUtils.getMousePos(canvas, e);
       const centerX = SCREEN_SIZE.width / 2;
       const centerY = SCREEN_SIZE.height / 2;
-      const angle = GameUtils.getAngle({ x: centerX, y: centerY }, pos);
-      angleRef.current = angle;
+      angleRef.current = GameUtils.getAngle({ x: centerX, y: centerY }, pos);
+    };
+
+    // 키보드 (일시정지)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        setIsPaused((prev) => {
+          const newPaused = !prev;
+          isPausedRef.current = newPaused;
+          return newPaused;
+        });
+      }
     };
 
     canvas.addEventListener("mousemove", handleMouseMove);
-
-    let lastUpdate = Date.now();
-
-    const gameLoop = () => {
-      const now = Date.now();
-      const delta = now - lastUpdate;
-
-      if (delta > 1000 / 30) {
-        lastUpdate = now;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, SCREEN_SIZE.width, SCREEN_SIZE.height);
-
-        // Draw world background with tiled image
-        if (backgroundPatternRef.current && backgroundImageRef.current) {
-          ctx.save();
-
-          // 월드 오프셋에 맞춰 패턴 위치 조정
-          const imgWidth = backgroundImageRef.current.width;
-          const imgHeight = backgroundImageRef.current.height;
-
-          const patternOffsetX =
-            ((worldRef.current.x % imgWidth) + imgWidth) % imgWidth;
-          const patternOffsetY =
-            ((worldRef.current.y % imgHeight) + imgHeight) % imgHeight;
-
-          ctx.fillStyle = backgroundPatternRef.current;
-          ctx.translate(-patternOffsetX, -patternOffsetY);
-          ctx.fillRect(
-            -patternOffsetX,
-            -patternOffsetY,
-            SCREEN_SIZE.width + imgWidth * 2,
-            SCREEN_SIZE.height + imgHeight * 2
-          );
-
-          // Restore context state
-          ctx.restore();
-        } else {
-          // Fallback to solid color if image not loaded
-          ctx.fillStyle = "#90c542";
-          ctx.fillRect(0, 0, SCREEN_SIZE.width, SCREEN_SIZE.height);
-        }
-
-        // Draw world background
-        // ctx.fillStyle = "#17202A";
-        // ctx.fillRect(0, 0, SCREEN_SIZE.width, SCREEN_SIZE.height);
-
-        const playerRef = localPlayerRef.current; // 👈 이 줄 추가 - 매 프레임 최신 값 사용
-
-        if (playerRef) {
-          // Update velocity
-          velocityRef.current = {
-            x: playerRef.force * Math.cos(angleRef.current),
-            y: playerRef.force * Math.sin(angleRef.current),
-          };
-
-          // Update world offset
-          worldRef.current = {
-            x: worldRef.current.x + velocityRef.current.x,
-            y: worldRef.current.y + velocityRef.current.y,
-          };
-
-          // Update body parts - 뱀이 따라오도록
-          const d = playerRef.size / 2;
-
-          // 각 bodyPart를 현재 각도 기준으로 배치
-          for (let i = playerRef.bodyParts.length - 1; i >= 1; i--) {
-            playerRef.bodyParts[i].x =
-              playerRef.bodyParts[i - 1].x - d * Math.cos(angleRef.current);
-            playerRef.bodyParts[i].y =
-              playerRef.bodyParts[i - 1].y - d * Math.sin(angleRef.current);
-          }
-
-          // 첫 번째 bodyPart는 머리(중앙) 기준으로 배치
-          if (playerRef.bodyParts.length > 0) {
-            const headX = SCREEN_SIZE.width / 2;
-            const headY = SCREEN_SIZE.height / 2;
-
-            playerRef.bodyParts[0].x = headX - d * Math.cos(angleRef.current);
-            playerRef.bodyParts[0].y = headY - d * Math.sin(angleRef.current);
-          }
-
-          // Get latest foods from store
-          const currentFoods = useGameStore.getState().foods;
-
-          // console.log(
-          //   `🍎 Foods count: ${currentFoods.length}`,
-          //   currentFoods[0]
-          // );
-
-          // Draw foods
-          currentFoods.forEach((food) => {
-            const screenX = food.position.x - worldRef.current.x;
-            const screenY = food.position.y - worldRef.current.y;
-
-            if (
-              screenX > -50 &&
-              screenX < SCREEN_SIZE.width + 50 &&
-              screenY > -50 &&
-              screenY < SCREEN_SIZE.height + 50
-            ) {
-              ctx.globalAlpha = 0.5;
-              ctx.fillStyle = food.token.color;
-              ctx.beginPath();
-              ctx.arc(screenX, screenY, 5, 0, 2 * Math.PI);
-              ctx.fill();
-
-              ctx.globalAlpha = 1;
-              ctx.fillStyle = "#FFFFFF";
-              ctx.beginPath();
-              ctx.arc(screenX, screenY, 2, 0, 2 * Math.PI);
-              ctx.fill();
-
-              // Check collision
-              const centerX = SCREEN_SIZE.width / 2;
-              const centerY = SCREEN_SIZE.height / 2;
-              if (
-                GameUtils.circleCollision(
-                  centerX,
-                  centerY,
-                  playerRef.size + 3,
-                  screenX,
-                  screenY,
-                  5
-                )
-              ) {
-                socketService.eatFood(food.id);
-              }
-            }
-          });
-
-          // Draw local player
-          drawSnake(ctx, playerRef);
-
-          // Draw minimap
-          drawMinimap(ctx, playerRef);
-
-          // Update server with position
-          socketService.updatePosition({
-            x: -worldRef.current.x + SCREEN_SIZE.width / 2,
-            y: -worldRef.current.y + SCREEN_SIZE.height / 2,
-            angle: angleRef.current,
-          });
-        }
-      }
-
-      animationIdRef.current = requestAnimationFrame(gameLoop);
-
-      // 다른 플레이어들 렌더링 (최적화 버전)
-      const allPlayers = useGameStore.getState().players;
-      const visiblePlayers: Player[] = [];
-
-      // 1️⃣ 화면에 보이는 플레이어만 필터링
-      allPlayers.forEach((otherPlayer) => {
-        if (otherPlayer.id === currentPlayer?.id) return;
-        if (!otherPlayer.alive) return;
-
-        const screenX = otherPlayer.position.x - worldRef.current.x;
-        const screenY = otherPlayer.position.y - worldRef.current.y;
-
-        // 화면 밖 플레이어는 건너뛰기 (마진 포함)
-        const margin = 100;
-        if (
-          screenX < -margin ||
-          screenX > SCREEN_SIZE.width + margin ||
-          screenY < -margin ||
-          screenY > SCREEN_SIZE.height + margin
-        ) {
-          return;
-        }
-
-        visiblePlayers.push(otherPlayer);
-      });
-
-      // 2️⃣ 보이는 플레이어만 렌더링 (최대 50명까지만)
-      const maxVisible = 50;
-      visiblePlayers.slice(0, maxVisible).forEach((otherPlayer) => {
-        const screenX = otherPlayer.position.x - worldRef.current.x;
-        const screenY = otherPlayer.position.y - worldRef.current.y;
-
-        // 플레이어 크기 계산 (점수 기반)
-        const otherSize = 7 + Math.floor(otherPlayer.length / 30);
-
-        // 간단한 원으로 그리기 (머리)
-        ctx.fillStyle = "#FF6B6B";
-        ctx.globalAlpha = 0.8;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, otherSize, 0, 2 * Math.PI);
-        ctx.fill();
-
-        // 이름 표시
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "white";
-        ctx.font = "10px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(otherPlayer.name, screenX, screenY - otherSize - 5);
-      });
-
-      ctx.globalAlpha = 1; // 알파 리셋
-    };
-
-    gameLoop();
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      if (animationIdRef.current) {
-        cancelAnimationFrame(animationIdRef.current);
-      }
       canvas.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [localPlayer?.id, currentPlayer?.id]); // Run when localPlayer is ready
-
-  // 뱀 버전
-  const drawSnake = (ctx: CanvasRenderingContext2D, snake: any) => {
-    const centerX = SCREEN_SIZE.width / 2;
-    const centerY = SCREEN_SIZE.height / 2;
-    const angle = angleRef.current;
-
-    // Draw body
-    for (let i = snake.bodyParts.length - 1; i >= 0; i--) {
-      const part = snake.bodyParts[i];
-      // ✅ 뒤로 갈수록 점점 작아지는 효과 (더 자연스럽게)
-      const sizeRatio = 1 - (i / snake.bodyParts.length) * 0.3; // 최대 30% 작아짐
-      const radius = snake.size * sizeRatio;
-
-      const grd = ctx.createRadialGradient(
-        part.x,
-        part.y,
-        2,
-        part.x + 4,
-        part.y + 4,
-        10
-      );
-      grd.addColorStop(0, snake.supportColor);
-      grd.addColorStop(1, snake.midColor);
-
-      ctx.fillStyle = snake.mainColor;
-      ctx.beginPath();
-      ctx.arc(part.x, part.y, radius + 1, 0, 2 * Math.PI);
-      ctx.fill();
-
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(part.x, part.y, radius, 0, 2 * Math.PI);
-      ctx.fill();
-    }
-
-    // Draw head
-    const headSize = snake.size * 1.03; // ✅ 머리를 좀 더 크게
-    const grd = ctx.createRadialGradient(
-      centerX,
-      centerY,
-      2,
-      centerX + 4,
-      centerY + 4,
-      10
-    );
-    grd.addColorStop(0, snake.supportColor);
-    grd.addColorStop(1, snake.midColor);
-
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, headSize + 1, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // 더듬이 그리기 (2개) - 머리 앞쪽
-    const antennaLength = snake.size * 1.8;
-    const antennaWidth = 1.5;
-    const antennaColor = "#000";
-
-    for (let side = -1; side <= 1; side += 2) {
-      const antennaAngle = angle + (Math.PI / 4) * side;
-      const antennaStartX = centerX + headSize * 0.8 * Math.cos(angle);
-      const antennaStartY = centerY + headSize * 0.8 * Math.sin(angle);
-      const antennaEndX =
-        antennaStartX + antennaLength * Math.cos(antennaAngle);
-      const antennaEndY =
-        antennaStartY + antennaLength * Math.sin(antennaAngle);
-
-      ctx.strokeStyle = antennaColor;
-      ctx.lineWidth = antennaWidth;
-      ctx.beginPath();
-      ctx.moveTo(antennaStartX, antennaStartY);
-      ctx.lineTo(antennaEndX, antennaEndY);
-      ctx.stroke();
-
-      // 더듬이 끝 (작은 원)
-      ctx.fillStyle = antennaColor;
-      ctx.beginPath();
-      ctx.arc(antennaEndX, antennaEndY, 2, 0, 2 * Math.PI);
-      ctx.fill();
-    }
-
-    // 다리 그리기 - 몸체 부분에 여러 개
-    const legLength = snake.size * 1.5;
-    const legWidth = 2;
-    const legColor = "#000";
-
-    // bodyParts의 일부 위치에 다리 배치 (앞쪽부터)
-    const legCount = Math.min(6, Math.floor(snake.bodyParts.length / 3));
-    for (let i = 0; i < legCount; i++) {
-      const partIndex = Math.floor((i / legCount) * snake.bodyParts.length);
-      if (partIndex >= snake.bodyParts.length) continue;
-
-      const part = snake.bodyParts[partIndex];
-      const partSize =
-        snake.size * (1 - (partIndex / snake.bodyParts.length) * 0.3);
-
-      // 각 bodyPart에 양쪽 다리 2개씩
-      for (let side = -1; side <= 1; side += 2) {
-        const legAngle = angle + (Math.PI / 3) * side;
-        const legStartX =
-          part.x + partSize * 0.7 * Math.cos(angle + (Math.PI / 2) * side);
-        const legStartY =
-          part.y + partSize * 0.7 * Math.sin(angle + (Math.PI / 2) * side);
-        const legEndX = legStartX + legLength * Math.cos(legAngle);
-        const legEndY = legStartY + legLength * Math.sin(legAngle);
-
-        ctx.strokeStyle = legColor;
-        ctx.lineWidth = legWidth;
-        ctx.beginPath();
-        ctx.moveTo(legStartX, legStartY);
-        ctx.lineTo(legEndX, legEndY);
-        ctx.stroke();
-      }
-    }
-
-    // Draw eyes
-    const eyeDistance = headSize / 2;
-    const eyeAngle = Math.PI / 6;
-
-    const eye1 = {
-      x: centerX + eyeDistance * 2 * Math.cos(angleRef.current + eyeAngle),
-      y: centerY + eyeDistance * 2 * Math.sin(angleRef.current + eyeAngle),
-    };
-    const eye2 = {
-      x: centerX + eyeDistance * 2 * Math.cos(angleRef.current - eyeAngle),
-      y: centerY + eyeDistance * 2 * Math.sin(angleRef.current - eyeAngle),
-    };
-
-    // Eye 1
-    ctx.fillStyle = "black";
-    ctx.beginPath();
-    ctx.arc(eye1.x, eye1.y, snake.size / 2, 0, 2 * Math.PI);
-    ctx.fill();
-
-    ctx.fillStyle = "whitesmoke";
-    ctx.beginPath();
-    ctx.arc(
-      eye1.x + Math.cos(angleRef.current),
-      eye1.y + Math.sin(angleRef.current),
-      snake.size / 4,
-      0,
-      2 * Math.PI
-    );
-    ctx.fill();
-
-    // Eye 2
-    ctx.fillStyle = "black";
-    ctx.beginPath();
-    ctx.arc(eye2.x, eye2.y, snake.size / 2, 0, 2 * Math.PI);
-    ctx.fill();
-
-    ctx.fillStyle = "whitesmoke";
-    ctx.beginPath();
-    ctx.arc(
-      eye2.x + Math.cos(angleRef.current),
-      eye2.y + Math.sin(angleRef.current),
-      snake.size / 4,
-      0,
-      2 * Math.PI
-    );
-    ctx.fill();
-
-    // Draw name
-    ctx.fillStyle = "whitesmoke";
-    ctx.font = "12px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(snake.name, centerX, centerY - snake.size - 10);
-  };
-
-  // 개미 버전
-  // const drawSnake = (ctx: CanvasRenderingContext2D, snake: any) => {
-  //   const centerX = SCREEN_SIZE.width / 2;
-  //   const centerY = SCREEN_SIZE.height / 2;
-  //   const angle = angleRef.current;
-
-  //   // 개미 색상 (갈색 계열)
-  //   const antColor = snake.mainColor || "#8B4513";
-  //   const antDarkColor = snake.midColor || "#654321";
-  //   const antLightColor = snake.supportColor || "#A0522D";
-
-  //   // 1. 머리 그리기 (가장 앞)
-  //   const headSize = snake.size * 1.2;
-  //   const headGrd = ctx.createRadialGradient(
-  //     centerX,
-  //     centerY,
-  //     0,
-  //     centerX,
-  //     centerY,
-  //     headSize
-  //   );
-  //   headGrd.addColorStop(0, antLightColor);
-  //   headGrd.addColorStop(1, antDarkColor);
-
-  //   ctx.fillStyle = headGrd;
-  //   ctx.beginPath();
-  //   ctx.arc(centerX, centerY, headSize, 0, 2 * Math.PI);
-  //   ctx.fill();
-
-  //   // 머리 테두리
-  //   ctx.strokeStyle = "#000";
-  //   ctx.lineWidth = 1;
-  //   ctx.stroke();
-
-  //   // 2. 가슴 그리기 (머리 뒤)
-  //   const thoraxSize = snake.size * 0.9;
-  //   const thoraxX = centerX - headSize * 1.5 * Math.cos(angle);
-  //   const thoraxY = centerY - headSize * 1.5 * Math.sin(angle);
-
-  //   const thoraxGrd = ctx.createRadialGradient(
-  //     thoraxX,
-  //     thoraxY,
-  //     0,
-  //     thoraxX,
-  //     thoraxY,
-  //     thoraxSize
-  //   );
-  //   thoraxGrd.addColorStop(0, antLightColor);
-  //   thoraxGrd.addColorStop(1, antDarkColor);
-
-  //   ctx.fillStyle = thoraxGrd;
-  //   ctx.beginPath();
-  //   ctx.arc(thoraxX, thoraxY, thoraxSize, 0, 2 * Math.PI);
-  //   ctx.fill();
-  //   ctx.stroke();
-
-  //   // 3. 배 그리기 (가슴 뒤, 여러 마디)
-  //   const abdomenSegments = Math.max(3, Math.floor(snake.bodyParts.length / 5));
-  //   const segmentSize = snake.size * 0.7;
-  //   const segmentSpacing = segmentSize * 1.3;
-
-  //   // 마지막 배 마디 위치 저장 (다리 그리기용)
-  //   let lastAbdomenX = 0;
-  //   let lastAbdomenY = 0;
-
-  //   for (let i = 0; i < abdomenSegments; i++) {
-  //     const segmentX =
-  //       thoraxX - (thoraxSize + segmentSpacing * (i + 0.5)) * Math.cos(angle);
-  //     const segmentY =
-  //       thoraxY - (thoraxSize + segmentSpacing * (i + 0.5)) * Math.sin(angle);
-
-  //     // ✅ 크기 그대로 유지 (작아지는 효과 제거)
-  //     const currentSegmentSize = segmentSize;
-
-  //     const segmentGrd = ctx.createRadialGradient(
-  //       segmentX,
-  //       segmentY,
-  //       0,
-  //       segmentX,
-  //       segmentY,
-  //       currentSegmentSize
-  //     );
-  //     segmentGrd.addColorStop(0, antLightColor);
-  //     segmentGrd.addColorStop(1, antDarkColor);
-
-  //     ctx.fillStyle = segmentGrd;
-  //     ctx.beginPath();
-  //     ctx.arc(segmentX, segmentY, currentSegmentSize, 0, 2 * Math.PI);
-  //     ctx.fill();
-  //     ctx.stroke();
-
-  //     // 마지막 마디 위치 저장
-  //     if (i === abdomenSegments - 1) {
-  //       lastAbdomenX = segmentX;
-  //       lastAbdomenY = segmentY;
-  //     }
-  //   }
-
-  //   // 4. 다리 그리기 (6개)
-  //   const legLength = snake.size * 1.5;
-  //   const legWidth = 2;
-  //   const legColor = "#000"; // ✅ 테두리 색상과 동일
-
-  //   // 머리 다리 2개
-  //   for (let side = -1; side <= 1; side += 2) {
-  //     const legAngle = angle + (Math.PI / 3) * side;
-  //     const legStartX =
-  //       centerX + headSize * 0.7 * Math.cos(angle + (Math.PI / 2) * side);
-  //     const legStartY =
-  //       centerY + headSize * 0.7 * Math.sin(angle + (Math.PI / 2) * side);
-  //     const legEndX = legStartX + legLength * Math.cos(legAngle);
-  //     const legEndY = legStartY + legLength * Math.sin(legAngle);
-
-  //     ctx.strokeStyle = legColor; // ✅ 테두리 색상
-  //     ctx.lineWidth = legWidth;
-  //     ctx.beginPath();
-  //     ctx.moveTo(legStartX, legStartY);
-  //     ctx.lineTo(legEndX, legEndY);
-  //     ctx.stroke();
-  //   }
-
-  //   // 가슴 다리 2개
-  //   for (let side = -1; side <= 1; side += 2) {
-  //     const legAngle = angle + (Math.PI / 3) * side;
-  //     const legStartX =
-  //       thoraxX + thoraxSize * 0.7 * Math.cos(angle + (Math.PI / 2) * side);
-  //     const legStartY =
-  //       thoraxY + thoraxSize * 0.7 * Math.sin(angle + (Math.PI / 2) * side);
-  //     const legEndX = legStartX + legLength * Math.cos(legAngle);
-  //     const legEndY = legStartY + legLength * Math.sin(legAngle);
-
-  //     ctx.strokeStyle = legColor; // ✅ 테두리 색상
-  //     ctx.lineWidth = legWidth;
-  //     ctx.beginPath();
-  //     ctx.moveTo(legStartX, legStartY);
-  //     ctx.lineTo(legEndX, legEndY);
-  //     ctx.stroke();
-  //   }
-
-  //   // 배 다리 2개 (첫 번째 마디)
-  //   const firstAbdomenX =
-  //     thoraxX - (thoraxSize + segmentSpacing * 0.5) * Math.cos(angle);
-  //   const firstAbdomenY =
-  //     thoraxY - (thoraxSize + segmentSpacing * 0.5) * Math.sin(angle);
-  //   for (let side = -1; side <= 1; side += 2) {
-  //     const legAngle = angle + (Math.PI / 3) * side;
-  //     const legStartX =
-  //       firstAbdomenX +
-  //       segmentSize * 0.7 * Math.cos(angle + (Math.PI / 2) * side);
-  //     const legStartY =
-  //       firstAbdomenY +
-  //       segmentSize * 0.7 * Math.sin(angle + (Math.PI / 2) * side);
-  //     const legEndX = legStartX + legLength * Math.cos(legAngle);
-  //     const legEndY = legStartY + legLength * Math.sin(legAngle);
-
-  //     ctx.strokeStyle = legColor; // ✅ 테두리 색상
-  //     ctx.lineWidth = legWidth;
-  //     ctx.beginPath();
-  //     ctx.moveTo(legStartX, legStartY);
-  //     ctx.lineTo(legEndX, legEndY);
-  //     ctx.stroke();
-  //   }
-
-  //   // ✅ 마지막 배 마디에 다리 2개 추가
-  //   if (abdomenSegments > 0) {
-  //     for (let side = -1; side <= 1; side += 2) {
-  //       const legAngle = angle + (Math.PI / 3) * side;
-  //       const legStartX =
-  //         lastAbdomenX +
-  //         segmentSize * 0.7 * Math.cos(angle + (Math.PI / 2) * side);
-  //       const legStartY =
-  //         lastAbdomenY +
-  //         segmentSize * 0.7 * Math.sin(angle + (Math.PI / 2) * side);
-  //       const legEndX = legStartX + legLength * Math.cos(legAngle);
-  //       const legEndY = legStartY + legLength * Math.sin(legAngle);
-
-  //       ctx.strokeStyle = legColor; // ✅ 테두리 색상
-  //       ctx.lineWidth = legWidth;
-  //       ctx.beginPath();
-  //       ctx.moveTo(legStartX, legStartY);
-  //       ctx.lineTo(legEndX, legEndY);
-  //       ctx.stroke();
-  //     }
-  //   }
-
-  //   // 5. 더듬이 그리기 (2개)
-  //   const antennaLength = snake.size * 1.8;
-  //   const antennaWidth = 1.5;
-  //   const antennaColor = "#000"; // ✅ 테두리 색상과 동일
-
-  //   for (let side = -1; side <= 1; side += 2) {
-  //     const antennaAngle = angle + (Math.PI / 4) * side;
-  //     const antennaStartX = centerX + headSize * 0.8 * Math.cos(angle);
-  //     const antennaStartY = centerY + headSize * 0.8 * Math.sin(angle);
-  //     const antennaEndX =
-  //       antennaStartX + antennaLength * Math.cos(antennaAngle);
-  //     const antennaEndY =
-  //       antennaStartY + antennaLength * Math.sin(antennaAngle);
-
-  //     ctx.strokeStyle = antennaColor;
-  //     ctx.lineWidth = antennaWidth;
-  //     ctx.beginPath();
-  //     ctx.moveTo(antennaStartX, antennaStartY);
-  //     ctx.lineTo(antennaEndX, antennaEndY);
-  //     ctx.stroke();
-
-  //     // 더듬이 끝 (작은 원)
-  //     ctx.fillStyle = antennaColor;
-  //     ctx.beginPath();
-  //     ctx.arc(antennaEndX, antennaEndY, 2, 0, 2 * Math.PI);
-  //     ctx.fill();
-  //   }
-
-  //   // Draw eyes
-  //   const eyeDistance = headSize / 2;
-  //   const eyeAngle = Math.PI / 6;
-
-  //   const eye1 = {
-  //     x: centerX + eyeDistance * 2 * Math.cos(angleRef.current + eyeAngle),
-  //     y: centerY + eyeDistance * 2 * Math.sin(angleRef.current + eyeAngle),
-  //   };
-  //   const eye2 = {
-  //     x: centerX + eyeDistance * 2 * Math.cos(angleRef.current - eyeAngle),
-  //     y: centerY + eyeDistance * 2 * Math.sin(angleRef.current - eyeAngle),
-  //   };
-
-  //   // Eye 1
-  //   ctx.fillStyle = "black";
-  //   ctx.beginPath();
-  //   ctx.arc(eye1.x, eye1.y, snake.size / 2, 0, 2 * Math.PI);
-  //   ctx.fill();
-
-  //   ctx.fillStyle = "whitesmoke";
-  //   ctx.beginPath();
-  //   ctx.arc(
-  //     eye1.x + Math.cos(angleRef.current),
-  //     eye1.y + Math.sin(angleRef.current),
-  //     snake.size / 4,
-  //     0,
-  //     2 * Math.PI
-  //   );
-  //   ctx.fill();
-
-  //   // Eye 2
-  //   ctx.fillStyle = "black";
-  //   ctx.beginPath();
-  //   ctx.arc(eye2.x, eye2.y, snake.size / 2, 0, 2 * Math.PI);
-  //   ctx.fill();
-
-  //   ctx.fillStyle = "whitesmoke";
-  //   ctx.beginPath();
-  //   ctx.arc(
-  //     eye2.x + Math.cos(angleRef.current),
-  //     eye2.y + Math.sin(angleRef.current),
-  //     snake.size / 4,
-  //     0,
-  //     2 * Math.PI
-  //   );
-  //   ctx.fill();
-
-  //   // 7. 이름 표시
-  //   ctx.fillStyle = "whitesmoke";
-  //   ctx.font = "12px Arial";
-  //   ctx.textAlign = "center";
-  //   ctx.fillText(snake.name, centerX, centerY - headSize - 15);
-  // };
-
-  const drawMinimap = (ctx: CanvasRenderingContext2D, playerRef: any) => {
-    ctx.globalAlpha = 0.5;
-
-    const mapSize = { width: 100, height: 50 };
-    const startX = 20;
-    const startY = SCREEN_SIZE.height - mapSize.height - 20;
-
-    // 미니맵 배경
-    ctx.fillStyle = "white";
-    ctx.fillRect(startX, startY, mapSize.width, mapSize.height);
-
-    ctx.globalAlpha = 1;
-
-    // 현재 플레이어 위치 표시
-    if (playerRef) {
-      const worldX = worldRef.current.x + SCREEN_SIZE.width / 2;
-      const worldY = worldRef.current.y + SCREEN_SIZE.height / 2;
-
-      // 월드 좌표를 미니맵 좌표로 변환 (오프셋 보정)
-      const adjustedX = worldX + 1200;
-      const adjustedY = worldY + 600;
-
-      const playerInMapX = (mapSize.width / WORLD_SIZE.width) * adjustedX;
-      const playerInMapY = (mapSize.height / WORLD_SIZE.height) * adjustedY;
-
-      ctx.fillStyle = playerRef.mainColor;
-      ctx.beginPath();
-      ctx.arc(startX + playerInMapX, startY + playerInMapY, 3, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // 맵 테두리
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(startX, startY, mapSize.width, mapSize.height);
-    }
-  };
+  }, [localPlayer]);
 
   return (
     <div className="game-canvas-container">

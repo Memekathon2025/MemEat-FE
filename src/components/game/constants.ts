@@ -1,0 +1,11 @@
+export const WORLD_SIZE = { width: 4000, height: 2000 };
+export const SCREEN_SIZE = { width: 800, height: 600 };
+export const SPAWN_ZONE_SIZE = 300;
+export const MAP_CENTER = { x: 800, y: 400 };
+export const MAX_SIZE = 20;
+export const BASE_SIZE = 7;
+export const SIZE_INCREASE_INTERVAL = 30;
+export const SIZE_INCREMENT = 1.5;
+export const MAX_VISIBLE_PLAYERS = 50;
+export const LERP_FACTOR = 0.2;
+export const FPS = 30;

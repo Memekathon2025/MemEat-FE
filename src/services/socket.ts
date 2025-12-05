@@ -95,7 +95,7 @@ class SocketService {
     this.socket?.on("player-updated", callback);
   }
 
-  onPlayerDiedCollision(callback: () => void) {
+  onPlayerDiedCollision(callback: (player?: Player) => void) {
     this.socket?.on("player-died-collision", callback);
   }
 
@@ -117,6 +117,7 @@ class SocketService {
 
   disconnect() {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
