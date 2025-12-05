@@ -129,6 +129,19 @@
   left: 100%;
 }
 
+.escape-button.disabled {
+  background: linear-gradient(135deg, #9e9e9e 0%, #616161 100%);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.escape-button.disabled:hover {
+  animation: none;
+  box-shadow: none;
+  background: linear-gradient(135deg, #9e9e9e 0%, #616161 100%);
+  transform: none;
+}
+
 @keyframes shake {
   0% { transform: translate(0, 0) rotate(0deg); }
   10% { transform: translate(-4px, -3px) rotate(-2deg); }

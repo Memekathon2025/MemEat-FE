@@ -61,17 +61,20 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
         </div>
       )}
 
-      {canEscape && (
-        <div className="escape-section">
-          <button className="escape-button pulse" onClick={onEscape}>
-            ESCAPE NOW!
-          </button>
+      <div className="escape-section">
+        <button
+          className={`escape-button ${canEscape ? "pulse" : "disabled"}`}
+          onClick={onEscape}
+          disabled={!canEscape}
+        >
+          {canEscape ? "ESCAPE NOW!" : `ESCAPE (Need ${100 - currentPlayer.score} more score)`}
+        </button>
+        {canEscape && (
           <p className="escape-hint">
-            Escape unlocked! <br />
-            Click button or <b>Right Click</b> to escape.
+            Escape unlocked! Click the button to escape safely.
           </p>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="controls-hint">
         <p>🖱️ Control direction with your mouse</p>

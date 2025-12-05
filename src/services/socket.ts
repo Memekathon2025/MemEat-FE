@@ -109,7 +109,7 @@ class SocketService {
     this.socket?.on("can-escape", callback);
   }
 
-  onEscapeSuccess(callback: (data: { score: number; collectedTokens: TokenBalance[] }) => void) {
+  onEscapeSuccess(callback: () => void) {
     this.socket?.on("escape-success", callback);
   }
 

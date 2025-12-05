@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { StartScreen } from "./components/ui/StartScreen";
 import { GameCanvas } from "./components/game/GameCanvas";
 import { Leaderboard } from "./components/ui/Leaderboard";
@@ -6,7 +6,6 @@ import { GameOverlay } from "./components/ui/GameOverlay";
 import { GameOver } from "./components/ui/GameOver";
 import { socketService } from "./services/socket";
 import { useGameStore } from "./store/gameStore";
-import { mockWeb3 } from "./services/mockWeb3";
 import type { TokenBalance } from "./types";
 import "./App.css";
 import { NavBar } from "./components/ui/NavBar";
@@ -17,7 +16,6 @@ function App() {
   const {
     currentPlayer,
     setCurrentPlayer,
-    gameStarted,
     setGameStarted,
     leaderboard,
     setLeaderboard,
@@ -33,6 +31,11 @@ function App() {
   const [finalScore, setFinalScore] = useState(0);
   const [finalTokens, setFinalTokens] = useState<TokenBalance[]>([]);
 
+  const lastPlayerStateRef = useRef<{
+    score: number;
+    collectedTokens: TokenBalance[];
+  } | null>(null);
+
   useEffect(() => {
     // Connect to server
     socketService.connect();
@@ -40,6 +43,23 @@ function App() {
     // Setup socket listeners
     socketService.onPlayerJoined((player) => {
       console.log("Player joined:", player);
+      useGameStore.getState().addPlayer(player);
+    });
+
+    socketService.onPlayerLeft((playerId) => {
+      console.log("Player left:", playerId);
+      useGameStore.getState().removePlayer(playerId);
+    });
+
+    socketService.onPlayerMoved((data) => {
+      useGameStore.getState().updatePlayer(data.socketId, {
+        position: data.position,
+        angle: data.position.angle,
+      });
+    });
+
+    socketService.onPlayerUpdated((player) => {
+      useGameStore.getState().updatePlayer(player.id, player);
     });
 
     socketService.onGameState((state) => {
@@ -62,13 +82,13 @@ function App() {
       setCanEscape(can);
     });
 
-    socketService.onEscapeSuccess((data) => {
-      console.log("🎉 Received escape-success event with data:", data);
-      handleGameOver(true, data);
+    socketService.onEscapeSuccess(() => {
+      console.log("🎉 Received escape-success event!");
+      handleGameOver(true);
     });
 
     socketService.onEscapeFailed((data) => {
-      alert(data.message);
+      console.log("❌ Escape failed:", data.message);
     });
 
     socketService.onError((error) => {
@@ -102,27 +122,33 @@ function App() {
 
   const handleEscape = () => {
     if (currentPlayer && canEscape) {
+      // Save state before escaping (Frontend-only fix for race condition)
+      lastPlayerStateRef.current = {
+        score: currentPlayer.score,
+        collectedTokens: [...currentPlayer.collectedTokens],
+      };
       socketService.playerEscape();
     }
   };
 
-  const handleGameOver = (
-    success: boolean,
-    data?: { score: number; collectedTokens: TokenBalance[] }
-  ) => {
+  const handleGameOver = (success: boolean) => {
     console.log(
       "Handling Game Over. Success:",
       success,
-      "Data:",
-      data,
       "CurrentPlayer:",
-      currentPlayer
+      currentPlayer,
+      "CachedState:",
+      lastPlayerStateRef.current
     );
 
-    const score = data?.score ?? currentPlayer?.score ?? 0;
-    const tokens = data?.collectedTokens ?? currentPlayer?.collectedTokens ?? [];
+    // Use current player state OR cached state if player is already removed
+    const score = currentPlayer?.score ?? lastPlayerStateRef.current?.score ?? 0;
+    const tokens =
+      currentPlayer?.collectedTokens ??
+      lastPlayerStateRef.current?.collectedTokens ??
+      [];
 
-    if (currentPlayer || data) {
+    if (currentPlayer || lastPlayerStateRef.current) {
       setFinalScore(score);
       setFinalTokens(tokens);
       setGameOverSuccess(success);
