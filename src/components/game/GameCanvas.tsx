@@ -170,6 +170,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
 
     canvas.addEventListener("mousemove", handleMouseMove);
 
+    // Right-click to escape
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      if (useGameStore.getState().canEscape) {
+        socketService.playerEscape();
+      }
+    };
+    canvas.addEventListener("contextmenu", handleContextMenu);
+
     let lastUpdate = Date.now();
 
     const gameLoop = () => {
@@ -377,6 +386,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver }) => {
         cancelAnimationFrame(animationIdRef.current);
       }
       canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("contextmenu", handleContextMenu);
     };
   }, [localPlayer?.id, currentPlayer?.id]); // Run when localPlayer is ready
 
