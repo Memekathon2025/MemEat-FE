@@ -8,6 +8,7 @@ import {
   useWalletClient,
 } from "wagmi";
 import { formatUnits } from "viem";
+import { ethers } from "ethers";
 
 import { web3Service } from "../../services/web3Service";
 
@@ -25,11 +26,19 @@ interface StartScreenProps {
     walletAddress: string;
     stakedTokens: TokenBalance[];
   }) => void;
+  onPendingClaim?: (claimData: {
+    score: number;
+    tokens: TokenBalance[];
+    survivalTime: number;
+  }) => void;
 }
 
 type TokenType = "M" | "MRC20";
 
-export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
+export const StartScreen: React.FC<StartScreenProps> = ({
+  onStart,
+  onPendingClaim,
+}) => {
   const { open } = useAppKit();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -42,6 +51,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   useEffect(() => {
     if (address) {
       checkActiveSession();
+      checkPendingClaim();
       setWalletAddress(address);
     } else {
       setWalletAddress("");
@@ -54,9 +64,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
 
   // 토큰 타입 선택
   const [tokenType, setTokenType] = useState<TokenType>("M");
-
-  // M 토큰 관련
-  const [mTokenBalance, setMTokenBalance] = useState(100); // Mock M 잔액
 
   // MRC-20 토큰 관련
   const [mrc20Address, setMrc20Address] = useState("");
@@ -129,6 +136,61 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
       }
     } catch (error) {
       console.error("Error rejoining:", error);
+    }
+  };
+
+  const checkPendingClaim = async () => {
+    try {
+      // 1. Pending Claim 먼저 체크
+      const claimResponse = await fetch(
+        `http://localhost:3333/api/check-pending-claim?walletAddress=${address}`
+      );
+      const claimResult = await claimResponse.json();
+
+      if (claimResult.success && claimResult.hasPendingClaim) {
+        // ✨ Claim 화면으로 바로 이동
+        const session = claimResult.session;
+
+        // 토큰 정보 변환
+        const tokens = session.rewardTokens.map(
+          (addr: string, idx: number) => ({
+            address: addr,
+            symbol:
+              addr === "0x0000000000000000000000000000000000000000"
+                ? "M"
+                : "Token",
+            amount: parseFloat(ethers.formatEther(session.rewardAmounts[idx])),
+            color:
+              addr === "0x0000000000000000000000000000000000000000"
+                ? "#FFD700"
+                : "#00FF00",
+          })
+        );
+
+        // GameOver 화면으로 이동 (success=true, claim 가능)
+        if (onPendingClaim) {
+          onPendingClaim({
+            score: session.finalScore,
+            tokens: tokens,
+            survivalTime: session.survivalTime,
+          });
+          return;
+        }
+      }
+
+      // 2. Active 세션 체크
+      const response = await fetch(
+        `http://localhost:3333/api/check-session?walletAddress=${address}`
+      );
+      const result = await response.json();
+
+      if (result.success && result.hasActiveSession) {
+        if (confirm("Active session found! Do you want to rejoin?")) {
+          await handleRejoin();
+        }
+      }
+    } catch (error) {
+      console.error("Error checking session:", error);
     }
   };
 

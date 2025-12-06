@@ -15,7 +15,7 @@ import { MapTokens } from "./components/ui/MapTokens";
 import type { Player, TokenBalance } from "./types";
 import "./App.css";
 
-type GamePhase = "start" | "playing" | "gameover";
+type GamePhase = "start" | "playing" | "gameover" | "pending-claim";
 
 function App() {
   const {
@@ -35,6 +35,11 @@ function App() {
   const [gameOverSuccess, setGameOverSuccess] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [finalTokens, setFinalTokens] = useState<TokenBalance[]>([]);
+  const [pendingClaimData, setPendingClaimData] = useState<{
+    score: number;
+    tokens: TokenBalance[];
+    survivalTime: number;
+  } | null>(null);
 
   const handleGameOver = useCallback(
     (success: boolean, player?: Player) => {
@@ -48,6 +53,21 @@ function App() {
       }
     },
     [currentPlayer]
+  );
+
+  const handlePendingClaim = useCallback(
+    (claimData: {
+      score: number;
+      tokens: TokenBalance[];
+      survivalTime: number;
+    }) => {
+      setPendingClaimData(claimData);
+      setFinalScore(claimData.score);
+      setFinalTokens(claimData.tokens);
+      setGameOverSuccess(true); // claim 가능한 상태
+      setGamePhase("pending-claim");
+    },
+    []
   );
 
   // ✨ success 업데이트 함수 추가
@@ -140,7 +160,24 @@ function App() {
     <div className="app">
       <NavBar />
 
-      {gamePhase === "start" && <StartScreen onStart={handleStartGame} />}
+      {gamePhase === "start" && (
+        <StartScreen
+          onStart={handleStartGame}
+          onPendingClaim={handlePendingClaim}
+        />
+      )}
+
+      {gamePhase === "pending-claim" && (
+        <>
+          <GameOver
+            success={true}
+            score={finalScore}
+            collectedTokens={finalTokens}
+            onPlayAgain={handlePlayAgain}
+            isBlockchainUpdating={false}
+          />
+        </>
+      )}
 
       {gamePhase === "playing" && (
         <>
