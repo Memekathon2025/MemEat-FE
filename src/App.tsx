@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { socketService } from "./services/socket";
 import { useGameStore } from "./store/gameStore";
+import { useSocketListeners } from "./hooks/useSocketListeners";
 
 import { StartScreen } from "./components/ui/StartScreen";
 import { GameCanvas } from "./components/game/GameCanvas";
@@ -9,11 +10,10 @@ import { Leaderboard } from "./components/ui/Leaderboard";
 import { GameOverlay } from "./components/ui/GameOverlay";
 import { GameOver } from "./components/ui/GameOver";
 import { NavBar } from "./components/ui/NavBar";
+import { MapTokens } from "./components/ui/MapTokens";
 
 import type { Player, TokenBalance } from "./types";
 import "./App.css";
-import { useSocketListeners } from "./hooks/useSocketListeners";
-import { MapTokens } from "./components/ui/MapTokens";
 
 type GamePhase = "start" | "playing" | "gameover";
 
@@ -45,16 +45,22 @@ function App() {
         setFinalTokens(playerToUse.collectedTokens);
         setGameOverSuccess(success);
         setGamePhase("gameover");
-
-        if (!success) {
-          socketService.playerDied();
-        }
       }
     },
     [currentPlayer]
   );
 
-  const { isBlockchainUpdating } = useSocketListeners(handleGameOver);
+  // ✨ success 업데이트 함수 추가
+  const updateGameOverSuccess = useCallback((success: boolean) => {
+    console.log(`🎯 Final success status: ${success}`);
+    setGameOverSuccess(success);
+  }, []);
+
+  // useSocketListeners에 업데이트 함수 전달
+  const { isBlockchainUpdating } = useSocketListeners(
+    handleGameOver,
+    updateGameOverSuccess
+  );
 
   // 리스너 등록 함수를 분리
   const setupSocketListeners = () => {
@@ -72,12 +78,6 @@ function App() {
     socketService.onGameStateUpdate((data) => {
       // console.log("Game state update received:", data);
       setLeaderboard(data.leaderboard);
-    });
-
-    socketService.onPlayerDiedCollision((deadPlayer) => {
-      // console.log("💥 You died from collision!");
-      // escape unlock 상태에서 죽으면 탈출 성공으로 간주
-      handleGameOver(canEscape, deadPlayer);
     });
 
     socketService.onCanEscape((can) => {

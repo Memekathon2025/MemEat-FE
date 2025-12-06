@@ -4,7 +4,8 @@ import { useGameStore } from "../store/gameStore";
 import type { Player } from "../types";
 
 export const useSocketListeners = (
-  onPlayerDied: (canEscape: boolean, deadPlayer?: Player) => void
+  onPlayerDied: (canEscape: boolean, deadPlayer?: Player) => void,
+  updateGameOverSuccess?: (success: boolean) => void
 ) => {
   const [isBlockchainUpdating, setIsBlockchainUpdating] = useState(false);
   const {
@@ -45,12 +46,22 @@ export const useSocketListeners = (
 
       if (!data.success) {
         alert("Warning: Blockchain update failed. Please contact support.");
-      }
-
-      // DB 업데이트가 완전히 반영될 때까지 대기
-      setTimeout(() => {
         setIsBlockchainUpdating(false);
-      }, 1000);
+      } else {
+        // ✨ 백엔드의 최종 판정으로 success 확정
+        if (data.status && updateGameOverSuccess) {
+          const actualSuccess = data.status === "EXITED";
+          console.log(
+            `🔄 Final status: ${data.status} → success: ${actualSuccess}`
+          );
+          updateGameOverSuccess(actualSuccess);
+        }
+
+        // 로딩 종료
+        setTimeout(() => {
+          setIsBlockchainUpdating(false);
+        }, 500);
+      }
     });
 
     socketService.onCanEscape((can) => {
@@ -76,6 +87,7 @@ export const useSocketListeners = (
   }, [
     canEscape,
     onPlayerDied,
+    updateGameOverSuccess,
     setPlayers,
     setFoods,
     setLeaderboard,

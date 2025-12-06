@@ -77,7 +77,7 @@ export const GameOver: React.FC<GameOverProps> = ({
         <div className="final-stats">
           <div className="stat">
             <span className="stat-label">SCORE</span>
-            <span className="stat-value">{score}</span>
+            <span className="stat-value">{score.toFixed(2)}</span>
           </div>
         </div>
 
@@ -91,7 +91,9 @@ export const GameOver: React.FC<GameOverProps> = ({
                   className="token-card"
                   style={{ borderColor: token.color }}
                 >
-                  <span className="token-amount">{token.amount}</span>
+                  <span className="token-amount">
+                    {token.amount.toFixed(2)}
+                  </span>
                   <span className="token-symbol" style={{ color: token.color }}>
                     {token.symbol}
                   </span>

@@ -98,6 +98,7 @@ class SocketService {
     callback: (data: {
       success: boolean;
       playerAddress: string;
+      status: string;
       error?: string;
     }) => void
   ) {
