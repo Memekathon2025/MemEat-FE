@@ -12,6 +12,8 @@ import { NavBar } from "./components/ui/NavBar";
 
 import type { Player, TokenBalance } from "./types";
 import "./App.css";
+import { useSocketListeners } from "./hooks/useSocketListeners";
+import { MapTokens } from "./components/ui/MapTokens";
 
 type GamePhase = "start" | "playing" | "gameover";
 
@@ -27,8 +29,8 @@ function App() {
     canEscape,
     setCanEscape,
     reset,
+    mapTokens,
   } = useGameStore();
-
   const [gamePhase, setGamePhase] = useState<GamePhase>("start");
   const [gameOverSuccess, setGameOverSuccess] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
@@ -51,6 +53,8 @@ function App() {
     },
     [currentPlayer]
   );
+
+  const { isBlockchainUpdating } = useSocketListeners(handleGameOver);
 
   // 리스너 등록 함수를 분리
   const setupSocketListeners = () => {
@@ -141,6 +145,7 @@ function App() {
       {gamePhase === "playing" && (
         <>
           <Leaderboard leaderboard={leaderboard} />
+          <MapTokens mapTokens={mapTokens} />
           <GameOverlay currentPlayer={currentPlayer} canEscape={canEscape} />
           <GameCanvas />
         </>
@@ -148,12 +153,14 @@ function App() {
       {gamePhase === "gameover" && (
         <>
           <Leaderboard leaderboard={leaderboard} />
+          <MapTokens mapTokens={mapTokens} />
           <GameOverlay currentPlayer={currentPlayer} canEscape={canEscape} />
           <GameOver
             success={gameOverSuccess}
             score={finalScore}
             collectedTokens={finalTokens}
             onPlayAgain={handlePlayAgain}
+            isBlockchainUpdating={isBlockchainUpdating}
           />
           <GameCanvas />
         </>

@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { useAppKit } from "@reown/appkit/react";
-import { useAccount, useBalance, useChainId, usePublicClient } from "wagmi";
+import {
+  useAccount,
+  useBalance,
+  useChainId,
+  usePublicClient,
+  useWalletClient,
+} from "wagmi";
 import { formatUnits } from "viem";
 
 import { web3Service } from "../../services/web3Service";
-import { mockWeb3 } from "../../services/mockWeb3";
 
 import type { TokenBalance } from "../../types";
 import "../../styles/StartScreen.css";
 import coin from "../../assets/coin.gif";
+
+const CONTRACT_ADDRESS =
+  import.meta.env.VITE_CONTRACT_ADDRESS ||
+  "0x04686e9284B54d8719A5a4DecaBE82158316C8f0";
 
 interface StartScreenProps {
   onStart: (playerData: {
@@ -28,10 +37,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   const { data: balance } = useBalance({
     address: address,
   });
+  const { data: walletClient } = useWalletClient();
 
   useEffect(() => {
-    console.log("Address changed:", address);
     if (address) {
+      checkActiveSession();
       setWalletAddress(address);
     } else {
       setWalletAddress("");
@@ -77,6 +87,51 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
     }
   };
 
+  const checkActiveSession = async () => {
+    console.log("?");
+    try {
+      const response = await fetch(
+        `http://localhost:3333/api/check-session?walletAddress=${address}`
+      );
+      const result = await response.json();
+      console.log(result);
+
+      if (result.success && result.hasActiveSession) {
+        // Active 세션이 있으면 재입장 여부 물어보기
+        if (confirm("Active session found! Do you want to rejoin?")) {
+          await handleRejoin();
+        }
+      }
+    } catch (error) {
+      console.error("Error checking session:", error);
+    }
+  };
+
+  const handleRejoin = async () => {
+    try {
+      const response = await fetch(`http://localhost:3333/api/rejoin-game`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: address,
+        }),
+      });
+
+      const result = await response.json();
+      console.log(result);
+      if (result.success) {
+        // 바로 게임 시작
+        onStart({
+          name: result.playerName,
+          walletAddress: address!,
+          stakedTokens: [],
+        });
+      }
+    } catch (error) {
+      console.error("Error rejoining:", error);
+    }
+  };
+
   // MRC-20 토큰 검증
   const handleVerifyMRC20 = async () => {
     if (!mrc20Address.trim()) return;
@@ -87,7 +142,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
 
     try {
       // 1. 토큰 검증
-      // const tokenInfo = await mockWeb3.verifyMRC20Token(mrc20Address);
       const tokenInfo = await web3Service.verifyMRC20Token(
         mrc20Address,
         chainId,
@@ -100,10 +154,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
       }
 
       // 2. 잔액 조회
-      // const balance = await mockWeb3.getMRC20Balance(
-      //   walletAddress,
-      //   mrc20Address
-      // );
       const balance = await web3Service.getMRC20Balance(
         walletAddress,
         mrc20Address,
@@ -113,8 +163,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
       );
 
       // 3. 가격 조회 및 입장료 계산
-      // const price = await mockWeb3.getTokenPrice(mrc20Address);
-      // const fee = await mockWeb3.calculateEntryFee(mrc20Address);
       const price = await web3Service.getTokenPrice(mrc20Address, chainId);
       const fee = await web3Service.calculateEntryFee(mrc20Address);
 
@@ -136,7 +184,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   // 토큰 타입 변경 시 입장료 재계산
   useEffect(() => {
     if (tokenType === "M") {
-      // setEntryFee(mockWeb3.getBaseEntryFee());
       setEntryFee(web3Service.getBaseEntryFee());
       setTokenPrice(1);
       setMrc20Info(null);
@@ -145,54 +192,99 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   }, [tokenType]);
 
   const handleStake = async () => {
-    if (!name) return;
+    if (!name || !walletClient) {
+      alert("지갑을 연결해주세요.");
+      return;
+    }
 
     setLoading(true);
     try {
-      let stakedToken: TokenBalance;
+      let tokenAddress: string;
+      let amount: string;
+      let isNativeToken: boolean;
 
       if (tokenType === "M") {
-        // M 토큰으로 입장
-        if (mTokenBalance < entryFee) {
-          alert("M 토큰 잔액이 부족합니다.");
-          return;
-        }
-
-        stakedToken = {
-          symbol: "M",
-          amount: entryFee,
-          color: "#FFD700",
-        };
+        // Native M 토큰
+        tokenAddress = "0x0000000000000000000000000000000000000000"; // ethers.ZeroAddress
+        amount = BigInt(entryFee * 1e18).toString(); // parseEther 대체
+        isNativeToken = true;
       } else {
-        // MRC-20 토큰으로 입장
-        if (!mrc20Info || mrc20Info.balance < entryFee) {
-          alert("토큰 잔액이 부족합니다.");
+        // MRC-20 토큰
+        if (!mrc20Info) {
+          alert("토큰 정보가 없습니다.");
           return;
         }
 
-        stakedToken = {
-          symbol: mrc20Info.symbol,
-          amount: entryFee,
-          color: getRandomColor(),
-        };
+        tokenAddress = mrc20Address;
+        amount = BigInt(entryFee * 1e18).toString();
+        isNativeToken = false;
+
+        // Approve 확인 및 실행
+        const allowance = await web3Service.checkAllowance(
+          publicClient,
+          tokenAddress,
+          address!,
+          CONTRACT_ADDRESS
+        );
+
+        if (allowance < BigInt(amount)) {
+          console.log("💳 Approving token...");
+          await web3Service.approveToken(
+            walletClient,
+            publicClient,
+            tokenAddress,
+            CONTRACT_ADDRESS,
+            amount
+          );
+        }
       }
 
-      // 스테이킹 처리
-      const success = await mockWeb3.stakeTokens(
-        stakedToken.symbol,
-        stakedToken.amount
+      // 트랜잭션 전송
+      console.log("✍️ Sending transaction...");
+      const txHash = await web3Service.enterGame(
+        walletClient,
+        publicClient,
+        CONTRACT_ADDRESS,
+        tokenAddress,
+        amount,
+        isNativeToken
       );
-      console.log(success);
 
-      if (success) {
-        onStart({
+      // 백엔드로 전송
+      const response = await fetch(`http://localhost:3333/api/enter-game`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name,
-          walletAddress,
-          stakedTokens: [stakedToken],
-        });
+          walletAddress: address,
+          txHash,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error);
       }
-    } catch (error) {
-      console.error("Failed to stake tokens:", error);
+
+      console.log("✅ Game entered! TX:", result.txHash);
+
+      // 게임 시작
+      onStart({
+        name,
+        walletAddress: address!,
+        stakedTokens: [
+          {
+            address: tokenAddress,
+            symbol: tokenType === "M" ? "M" : mrc20Info!.symbol,
+            amount: entryFee,
+            color: tokenType === "M" ? "#FFD700" : getRandomColor(),
+          },
+        ],
+      });
+    } catch (error: any) {
+      console.error("Failed to enter game:", error);
+      alert(`입장 실패: ${error.message || error}`);
     } finally {
       setLoading(false);
     }
@@ -205,7 +297,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
 
   const canStartGame = () => {
     if (tokenType === "M") {
-      return mTokenBalance >= entryFee;
+      return balance
+        ? parseFloat(formatUnits(balance.value, balance.decimals)) >= entryFee
+        : false;
     } else {
       return mrc20Info && mrc20Info.balance >= entryFee;
     }
@@ -271,12 +365,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
             ) : (
               <div className="staking-modal">
                 <h2>TOKEN STAKING</h2>
-                {/* <p className="staking-info">
-                  게임 입장료: <strong>M {mockWeb3.getBaseEntryFee()}개</strong>{" "}
-                  상응하는 토큰
-                  <br />
-                  스테이킹한 토큰은 맵에 배치됩니다.
-                </p> */}
 
                 {/* 토큰 타입 선택 */}
                 <div className="token-type-selection">
@@ -373,7 +461,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
                         <p>
                           Current Price:{" "}
                           <strong>
-                            1 M = {tokenPrice.toFixed(4)} {mrc20Info.symbol}
+                            1 M = {tokenPrice.toFixed(8)} {mrc20Info.symbol}
                           </strong>
                         </p>
                         <p>

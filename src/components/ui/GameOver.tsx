@@ -1,12 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
+import { usePublicClient, useWalletClient } from "wagmi";
+import { web3Service } from "../../services/web3Service";
 import type { TokenBalance } from "../../types";
 import "../../styles/GameOver.css";
+
+const CONTRACT_ADDRESS =
+  import.meta.env.VITE_CONTRACT_ADDRESS ||
+  "0x04686e9284B54d8719A5a4DecaBE82158316C8f0";
 
 interface GameOverProps {
   success: boolean;
   score: number;
   collectedTokens: TokenBalance[];
   onPlayAgain: () => void;
+  isBlockchainUpdating?: boolean;
 }
 
 export const GameOver: React.FC<GameOverProps> = ({
@@ -14,10 +21,36 @@ export const GameOver: React.FC<GameOverProps> = ({
   score,
   collectedTokens,
   onPlayAgain,
+  isBlockchainUpdating = false,
 }) => {
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+
+  const [isClaiming, setIsClaiming] = useState<boolean>(false);
+
   const handleClaim = async () => {
-    // TODO: claim
-    onPlayAgain();
+    if (!walletClient || !publicClient) {
+      alert("Wallet not connected");
+      return;
+    }
+    try {
+      setIsClaiming(true);
+
+      const txHash = await web3Service.claimReward(
+        walletClient,
+        publicClient,
+        CONTRACT_ADDRESS
+      );
+
+      alert(`🎉 Rewards claimed! TX: ${txHash}`);
+
+      onPlayAgain();
+    } catch (error: any) {
+      console.error("Claim error:", error);
+      alert(`Failed to claim: ${error.message}`);
+    } finally {
+      setIsClaiming(false);
+    }
   };
 
   return (
@@ -69,12 +102,24 @@ export const GameOver: React.FC<GameOverProps> = ({
         )}
 
         {success ? (
-          <button className="play-again-button" onClick={handleClaim}>
-            Claim
+          <button
+            className="play-again-button"
+            onClick={handleClaim}
+            disabled={isBlockchainUpdating}
+          >
+            {isClaiming
+              ? "Claiming..."
+              : isBlockchainUpdating
+              ? "Processing..."
+              : "Claim"}
           </button>
         ) : (
-          <button className="play-again-button" onClick={onPlayAgain}>
-            Retry
+          <button
+            className="play-again-button"
+            onClick={onPlayAgain}
+            disabled={isBlockchainUpdating}
+          >
+            {isBlockchainUpdating ? "Processing..." : "Retry"}
           </button>
         )}
       </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import type { Player, TokenBalance } from "../../types";
+import type { Player } from "../../types";
 import "../../styles/GameOverlay.css";
 
 interface GameOverlayProps {
@@ -12,13 +12,6 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
   canEscape,
 }) => {
   if (!currentPlayer) return null;
-
-  const getTotalTokenAmount = (): number => {
-    return currentPlayer.collectedTokens.reduce(
-      (sum, token) => sum + token.amount,
-      0
-    );
-  };
 
   return (
     <div className="game-overlay">
@@ -33,7 +26,9 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
         </div>
         <div className="stat-item">
           <span className="stat-label">Score:</span>
-          <span className="stat-value score">{currentPlayer.score}</span>
+          <span className="stat-value score">
+            {currentPlayer.score.toFixed(2)}
+          </span>
         </div>
         <div className="stat-item">
           <span className="stat-label">Length:</span>
@@ -52,7 +47,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
                 style={{ color: token.color }}
               >
                 <span className="token-symbol">{token.symbol}</span>
-                <span className="token-amount">{token.amount}</span>
+                <span className="token-amount">{token.amount.toFixed(2)}</span>
               </div>
             ))}
           </div>

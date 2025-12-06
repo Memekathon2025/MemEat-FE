@@ -30,7 +30,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ leaderboard }) => {
                 <div className="player-info">
                   <span className="player-name">{entry.name}</span>
                   <span className="player-stats">
-                    {entry.score}점 • {formatTime(entry.survivalTime)}
+                    EATEN: {entry.score.toFixed(2)}
+                    <br />
+                    TIME: {formatTime(entry.survivalTime)}
                   </span>
                 </div>
               </li>

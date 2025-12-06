@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Player, Food, LeaderboardEntry, TokenBalance } from "../types";
+import type { Player, Food, LeaderboardEntry } from "../types";
 
 interface GameStore {
   // User state
@@ -11,6 +11,14 @@ interface GameStore {
   players: Player[];
   foods: Food[];
   leaderboard: LeaderboardEntry[];
+  mapTokens: Array<{
+    symbol: string;
+    address: string;
+    amount: number;
+    count: number;
+    color: string;
+  }>;
+
   gameStarted: boolean;
   canEscape: boolean;
 
@@ -21,6 +29,8 @@ interface GameStore {
   setPlayers: (players: Player[]) => void;
   setFoods: (foods: Food[]) => void;
   setLeaderboard: (leaderboard: LeaderboardEntry[]) => void;
+  setMapTokens: (tokens: any[]) => void;
+
   setGameStarted: (started: boolean) => void;
   setCanEscape: (canEscape: boolean) => void;
 
@@ -43,6 +53,7 @@ export const useGameStore = create<GameStore>((set) => ({
   players: [],
   foods: [],
   leaderboard: [],
+  mapTokens: [],
   gameStarted: false,
   canEscape: false,
 
@@ -53,6 +64,7 @@ export const useGameStore = create<GameStore>((set) => ({
   setPlayers: (players) => set({ players }),
   setFoods: (foods) => set({ foods }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
+  setMapTokens: (tokens) => set({ mapTokens: tokens }),
   setGameStarted: (started) => set({ gameStarted: started }),
   setCanEscape: (canEscape) => set({ canEscape }),
 

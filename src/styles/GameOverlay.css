@@ -165,3 +165,14 @@
   color: #999;
   text-align: center;
 }
+
+.game-overlay-2 {
+  position: fixed;
+  top: 100px;
+  right: 20px;
+  padding: 1.5rem;
+  min-width: 280px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  border: 1px solid white;
+}

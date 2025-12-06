@@ -56,11 +56,6 @@ class SocketService {
     this.socket.emit("eat-food", foodId);
   }
 
-  playerDied() {
-    if (!this.socket?.connected) return;
-    this.socket.emit("player-died");
-  }
-
   playerEscape() {
     if (!this.socket?.connected) return;
     this.socket.emit("player-escape");
@@ -97,6 +92,16 @@ class SocketService {
 
   onPlayerDiedCollision(callback: (player?: Player) => void) {
     this.socket?.on("player-died-collision", callback);
+  }
+
+  onBlockchainUpdateComplete(
+    callback: (data: {
+      success: boolean;
+      playerAddress: string;
+      error?: string;
+    }) => void
+  ) {
+    this.socket?.on("blockchain-update-complete", callback);
   }
 
   onCanEscape(callback: (canEscape: boolean) => void) {

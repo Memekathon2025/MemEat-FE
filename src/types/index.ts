@@ -14,6 +14,7 @@ export interface Player {
 }
 
 export interface TokenBalance {
+  address: string;
   symbol: string;
   amount: number;
   color: string;
@@ -29,6 +30,13 @@ export interface GameState {
   players: Player[];
   foods: Food[];
   leaderboard: LeaderboardEntry[];
+  mapTokens?: Array<{
+    symbol: string;
+    address: string;
+    amount: number;
+    count: number;
+    color: string;
+  }>;
 }
 
 export interface LeaderboardEntry {
