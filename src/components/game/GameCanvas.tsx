@@ -248,7 +248,7 @@ export const GameCanvas = () => {
       ctx.fillStyle = "rgba(0, 255, 0, 0.8)";
       ctx.textAlign = "center";
       ctx.fillText(
-        "SAFE ZONE (Press Spacebar to Start",
+        "SAFE ZONE (Press Spacebar to Start)",
         spawnScreenX,
         spawnScreenY - SPAWN_ZONE_SIZE / 2 - 10
       );
