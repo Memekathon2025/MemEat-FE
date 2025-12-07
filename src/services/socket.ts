@@ -7,7 +7,7 @@ class SocketService {
 
   connect() {
     if (this.socket?.connected) {
-      console.log("Already connected to server");
+      // console.log("Already connected to server");
       return this.socket;
     }
 
@@ -42,7 +42,7 @@ class SocketService {
       console.error("Socket not connected");
       return;
     }
-    console.log("Joining game with:", playerData);
+    // console.log("Joining game with:", playerData);
     this.socket.emit("join-game", playerData);
   }
 

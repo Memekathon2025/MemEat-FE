@@ -33,8 +33,6 @@ export class EtherscanService {
       const response = await fetch(url);
       const data = await response.json();
 
-      console.log(data);
-
       if (data.status === "1" && data.result && data.result.length > 0) {
         const token = data.result[0];
         return {

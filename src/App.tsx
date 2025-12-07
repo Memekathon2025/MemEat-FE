@@ -72,7 +72,7 @@ function App() {
 
   // ✨ success 업데이트 함수 추가
   const updateGameOverSuccess = useCallback((success: boolean) => {
-    console.log(`🎯 Final success status: ${success}`);
+    // console.log(`🎯 Final success status: ${success}`);
     setGameOverSuccess(success);
   }, []);
 
@@ -85,7 +85,7 @@ function App() {
   // 리스너 등록 함수를 분리
   const setupSocketListeners = () => {
     socketService.onPlayerJoined((player) => {
-      console.log("Player joined:", player);
+      // console.log("Player joined:", player);
     });
 
     socketService.onGameState((state) => {

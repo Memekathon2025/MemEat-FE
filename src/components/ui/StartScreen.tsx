@@ -95,13 +95,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   };
 
   const checkActiveSession = async () => {
-    console.log("?");
     try {
       const response = await fetch(
         `http://localhost:3333/api/check-session?walletAddress=${address}`
       );
       const result = await response.json();
-      console.log(result);
 
       if (result.success && result.hasActiveSession) {
         // Active 세션이 있으면 재입장 여부 물어보기
@@ -125,7 +123,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       });
 
       const result = await response.json();
-      console.log(result);
       if (result.success) {
         // 바로 게임 시작
         onStart({
@@ -290,7 +287,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
         );
 
         if (allowance < BigInt(amount)) {
-          console.log("💳 Approving token...");
+          // console.log("💳 Approving token...");
           await web3Service.approveToken(
             walletClient,
             publicClient,
@@ -302,7 +299,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       }
 
       // 트랜잭션 전송
-      console.log("✍️ Sending transaction...");
+      // console.log("✍️ Sending transaction...");
       const txHash = await web3Service.enterGame(
         walletClient,
         publicClient,
@@ -329,7 +326,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
         throw new Error(result.error);
       }
 
-      console.log("✅ Game entered! TX:", result.txHash);
+      // console.log("✅ Game entered! TX:", result.txHash);
 
       // 게임 시작
       onStart({

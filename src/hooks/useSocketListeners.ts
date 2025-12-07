@@ -19,7 +19,7 @@ export const useSocketListeners = (
 
   useEffect(() => {
     socketService.onPlayerJoined((player) => {
-      console.log("Player joined:", player);
+      // console.log("Player joined:", player);
     });
 
     socketService.onGameState((state) => {
@@ -42,7 +42,7 @@ export const useSocketListeners = (
     });
 
     socketService.onBlockchainUpdateComplete((data) => {
-      console.log("✅ Blockchain state updated:", data.success);
+      // console.log("✅ Blockchain state updated:", data.success);
 
       if (!data.success) {
         alert("Warning: Blockchain update failed. Please contact support.");
@@ -51,9 +51,9 @@ export const useSocketListeners = (
         // ✨ 백엔드의 최종 판정으로 success 확정
         if (data.status && updateGameOverSuccess) {
           const actualSuccess = data.status === "EXITED";
-          console.log(
-            `🔄 Final status: ${data.status} → success: ${actualSuccess}`
-          );
+          // console.log(
+          //   `🔄 Final status: ${data.status} → success: ${actualSuccess}`
+          // );
           updateGameOverSuccess(actualSuccess);
         }
 

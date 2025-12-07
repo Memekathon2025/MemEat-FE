@@ -22,9 +22,9 @@ export class Web3Service {
     chainId: number,
     publicClient?: any
   ): Promise<MRC20TokenInfo> {
-    console.log(
-      `🔍 Verifying MRC-20 token: ${tokenAddress} on chain ${chainId}`
-    );
+    // console.log(
+    //   `🔍 Verifying MRC-20 token: ${tokenAddress} on chain ${chainId}`
+    // );
 
     try {
       // 1. Etherscan API로 시도
@@ -97,9 +97,9 @@ export class Web3Service {
     decimals: number,
     publicClient?: any
   ): Promise<number> {
-    console.log(
-      `💰 Getting MRC-20 balance for ${walletAddress} on chain ${chainId}`
-    );
+    // console.log(
+    //   `💰 Getting MRC-20 balance for ${walletAddress} on chain ${chainId}`
+    // );
 
     try {
       if (publicClient) {
@@ -126,7 +126,7 @@ export class Web3Service {
 
   // 토큰 가격 조회 ($M 기준)
   async getTokenPrice(tokenAddress: string, chainId?: number): Promise<number> {
-    console.log(`💵 Getting token price for ${tokenAddress} (${chainId})`);
+    // console.log(`💵 Getting token price for ${tokenAddress} (${chainId})`);
 
     // 네이티브 토큰 (M)의 경우
     if (tokenAddress === "$M" || !tokenAddress) {
@@ -153,7 +153,7 @@ export class Web3Service {
 
       if (priceNow && !isNaN(parseFloat(priceNow))) {
         const price = parseFloat(priceNow);
-        console.log(`💵 Token price: ${price} M`);
+        // console.log(`💵 Token price: ${price} M`);
         return price;
       }
 
@@ -205,7 +205,7 @@ export class Web3Service {
     if (!walletClient || !walletClient.account) {
       throw new Error("Wallet not connected");
     }
-    console.log("✍️ Preparing transaction...");
+    // console.log("✍️ Preparing transaction...");
 
     const { writeContract } = await import("viem/actions");
 
@@ -219,9 +219,9 @@ export class Web3Service {
       value: isNativeToken ? BigInt(amount) : 0n,
     });
 
-    console.log("📤 Transaction sent:", hash);
+    // console.log("📤 Transaction sent:", hash);
     await publicClient.waitForTransactionReceipt({ hash });
-    console.log("✅ Transaction confirmed!");
+    // console.log("✅ Transaction confirmed!");
 
     return hash;
   }
@@ -237,7 +237,7 @@ export class Web3Service {
       throw new Error("Wallet not connected");
     }
 
-    console.log("💳 Approving token...");
+    // console.log("💳 Approving token...");
 
     const { writeContract } = await import("viem/actions");
 
@@ -250,7 +250,7 @@ export class Web3Service {
       args: [spenderAddress as `0x${string}`, BigInt(amount)],
     });
 
-    console.log(`⏳ Approving... TX: ${hash}`);
+    // console.log(`⏳ Approving... TX: ${hash}`);
 
     await publicClient.waitForTransactionReceipt({ hash });
 
@@ -281,7 +281,7 @@ export class Web3Service {
       throw new Error("Wallet not connected");
     }
 
-    console.log("💰 Claiming reward...");
+    // console.log("💰 Claiming reward...");
 
     const { writeContract } = await import("viem/actions");
 
@@ -294,12 +294,12 @@ export class Web3Service {
       args: [],
     });
 
-    console.log("📤 Claim transaction sent:", hash);
+    // console.log("📤 Claim transaction sent:", hash);
 
     // 트랜잭션 완료 대기
-    console.log("⏳ Waiting for claim confirmation...");
+    // console.log("⏳ Waiting for claim confirmation...");
     await publicClient.waitForTransactionReceipt({ hash });
-    console.log("✅ Claim confirmed!");
+    // console.log("✅ Claim confirmed!");
 
     return hash;
   }
