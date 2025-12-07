@@ -3,7 +3,8 @@ import type { GameState, Player, TokenBalance } from "../types";
 
 class SocketService {
   private socket: Socket | null = null;
-  private serverUrl: string = "http://localhost:3333";
+  // private serverUrl: string = "http://localhost:3333";
+  private serverUrl: string = "https://memeat-be.onrender.com";
 
   connect() {
     if (this.socket?.connected) {

@@ -97,7 +97,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   const checkActiveSession = async () => {
     try {
       const response = await fetch(
-        `http://localhost:3333/api/check-session?walletAddress=${address}`
+        // `http://localhost:3333/api/check-session?walletAddress=${address}`
+        `https://memeat-be.onrender.com/api/check-session?walletAddress=${address}`
       );
       const result = await response.json();
 
@@ -114,13 +115,17 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
   const handleRejoin = async () => {
     try {
-      const response = await fetch(`http://localhost:3333/api/rejoin-game`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: address,
-        }),
-      });
+      // const response = await fetch(`http://localhost:3333/api/rejoin-game`, {
+      const response = await fetch(
+        `https://memeat-be.onrender.com/api/rejoin-game`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletAddress: address,
+          }),
+        }
+      );
 
       const result = await response.json();
       if (result.success) {
@@ -140,7 +145,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({
     try {
       // 1. Pending Claim 먼저 체크
       const claimResponse = await fetch(
-        `http://localhost:3333/api/check-pending-claim?walletAddress=${address}`
+        // `http://localhost:3333/api/check-pending-claim?walletAddress=${address}`
+        `https://memeat-be.onrender.com/api/check-pending-claim?walletAddress=${address}`
       );
       const claimResult = await claimResponse.json();
 
@@ -177,7 +183,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
       // 2. Active 세션 체크
       const response = await fetch(
-        `http://localhost:3333/api/check-session?walletAddress=${address}`
+        // `http://localhost:3333/api/check-session?walletAddress=${address}`
+        `https://memeat-be.onrender.com/api/check-session?walletAddress=${address}`
       );
       const result = await response.json();
 
@@ -310,15 +317,19 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       );
 
       // 백엔드로 전송
-      const response = await fetch(`http://localhost:3333/api/enter-game`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          walletAddress: address,
-          txHash,
-        }),
-      });
+      // const response = await fetch(`http://localhost:3333/api/enter-game`, {
+      const response = await fetch(
+        `https://memeat-be.onrender.com/api/enter-game`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            walletAddress: address,
+            txHash,
+          }),
+        }
+      );
 
       const result = await response.json();
 

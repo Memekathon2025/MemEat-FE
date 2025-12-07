@@ -136,7 +136,8 @@ export class Web3Service {
     try {
       // MemeX API 호출
       const chainIdNum = chainId ? chainId : 4352;
-      const url = `http://localhost:3333/api/price/${chainIdNum}/${tokenAddress}`;
+      // const url = `http://localhost:3333/api/price/${chainIdNum}/${tokenAddress}`;
+      const url = `https://memeat-be.onrender.com/api/price/${chainIdNum}/${tokenAddress}`;
       const response = await fetch(url);
 
       if (!response.ok) {
