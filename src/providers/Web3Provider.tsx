@@ -1,7 +1,6 @@
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import {
-  mainnet,
   memecore,
   formicarium,
   type AppKitNetwork,
@@ -24,10 +23,7 @@ const metadata = {
 };
 
 // 3. Set the networks
-const networks = [mainnet, memecore, formicarium] as [
-  AppKitNetwork,
-  ...AppKitNetwork[]
-];
+const networks = [memecore, formicarium] as [AppKitNetwork, ...AppKitNetwork[]];
 
 // 4. Create Wagmi Adapter
 const wagmiAdapter = new WagmiAdapter({
@@ -42,6 +38,7 @@ createAppKit({
   networks,
   projectId,
   metadata,
+  defaultNetwork: formicarium,
   features: {
     analytics: true,
   },
